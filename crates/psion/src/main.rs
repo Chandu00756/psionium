@@ -727,10 +727,17 @@ fn read_passphrase_file(path: &Path) -> Result<Zeroizing<String>> {
     Ok(Zeroizing::new(line.to_string()))
 }
 
+const NO_TERMINAL: &str = "cannot ask for a passphrase without a terminal; use --passphrase-file (or --no-passphrase for keygen)";
+
 fn prompt(message: &str) -> Result<Zeroizing<String>> {
+    // On Windows the prompt reads the console even when nobody is at it (a service or CI job),
+    // and would wait forever; ask only when a person can answer.
+    if cfg!(windows) && !io::stdin().is_terminal() && !io::stderr().is_terminal() {
+        bail!(NO_TERMINAL);
+    }
     rpassword::prompt_password(message)
         .map(Zeroizing::new)
-        .map_err(|_| anyhow!("cannot ask for a passphrase without a terminal; use --passphrase-file (or --no-passphrase for keygen)"))
+        .map_err(|_| anyhow!(NO_TERMINAL))
 }
 
 /// Non-empty, non-comment lines of a key list file, with line numbers.

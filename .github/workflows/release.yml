@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Run by hand to check that every platform builds; only a tag publishes a release.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,11 +15,13 @@ env:
 jobs:
   check-version:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Tag matches the crate version
         run: |
           version=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          if [ "$GITHUB_REF_TYPE" != tag ]; then echo "not a tag: building $version without publishing"; exit 0; fi
           test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
 
   build:
@@ -33,6 +37,7 @@ jobs:
           - { target: x86_64-apple-darwin, os: macos-latest, archive: tar.gz, cross: false, runs: false, test: false }
           - { target: x86_64-pc-windows-msvc, os: windows-latest, archive: zip, cross: false, runs: true, test: true }
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     permissions:
       contents: read
       id-token: write
@@ -81,7 +86,9 @@ jobs:
 
   publish:
     needs: build
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
