@@ -1,0 +1,18 @@
+[package]
+name = "psionium-core"
+description = "Post-quantum file encryption: the .psen v2 format (X25519 + ML-KEM, AES-256-GCM)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+aws-lc-rs = "1.18.2"
+base64 = "0.23.1"
+thiserror = "2.0.21"
+zeroize = { version = "1.9.1", features = ["derive"] }
+
+[dev-dependencies]
+aws-lc-rs = "1.18.2"
+base64 = "0.23.1"

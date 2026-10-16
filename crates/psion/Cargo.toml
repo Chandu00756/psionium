@@ -1,0 +1,20 @@
+[package]
+name = "psion"
+description = "Command-line tool for pSIONIUM post-quantum file encryption"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+psionium-core = { version = "0.1.0", path = "../psionium-core" }
+tempfile = "3.27.0"
+zeroize = "1.9.1"
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
+tempfile = "3.27.0"
