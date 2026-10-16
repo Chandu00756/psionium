@@ -1,0 +1,44 @@
+import sys
+import os
+import base64
+
+# Add the project root directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'modules'))
+
+# Import the EncryptionModule
+from encryptionmodule.encryption_module import EncryptionModule
+
+# Initialize the Encryption Module
+encryption_module = EncryptionModule()
+
+# Test data
+data = b"Hello, Psionium!"
+
+# Test Kyber
+try:
+    print("Testing Kyber...")
+    encrypted_data = encryption_module.encrypt(data, "Kyber")
+    decrypted_data = encryption_module.decrypt(encrypted_data, "Kyber")
+    print("Kyber Decrypted Data (base64):", base64.b64encode(decrypted_data).decode('utf-8'))
+except Exception as e:
+    print("Kyber test failed:", e)
+
+# Test AES-256
+try:
+    print("\nTesting AES-256...")
+    key = os.urandom(32)  # Generate a 256-bit key
+    encrypted_data = encryption_module.encrypt(data, "AES-256", key)
+    decrypted_data = encryption_module.decrypt(encrypted_data, "AES-256", key)
+    print("AES-256 Decrypted Data:", decrypted_data.decode('utf-8'))
+except Exception as e:
+    print("AES-256 test failed:", e)
+
+# Test ChaCha20
+try:
+    print("\nTesting ChaCha20...")
+    key = os.urandom(32)  # Generate a 256-bit key
+    encrypted_data = encryption_module.encrypt(data, "ChaCha20", key)
+    decrypted_data = encryption_module.decrypt(encrypted_data, "ChaCha20", key)
+    print("ChaCha20 Decrypted Data:", decrypted_data.decode('utf-8'))
+except Exception as e:
+    print("ChaCha20 test failed:", e)

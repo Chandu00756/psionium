@@ -1,0 +1,48 @@
+use psionium_ai_threat_detection::detector::ThreatDetector;
+use log::{info, warn};
+use anyhow::{Result, anyhow};
+use std::collections::VecDeque;
+use tokio::sync::RwLock;
+
+pub struct NetworkAnomalyDetector {
+    detector: ThreatDetector,
+    packet_history: RwLock<VecDeque<Vec<f64>>>,
+    window_size: usize,
+}
+
+impl NetworkAnomalyDetector {
+    pub fn new(detector: ThreatDetector, window_size: usize) -> Self {
+        info!("Initialized ultra-advanced network anomaly detector");
+        NetworkAnomalyDetector {
+            detector,
+            packet_history: RwLock::new(VecDeque::with_capacity(window_size)),
+            window_size,
+        }
+    }
+
+    pub async fn analyze_packet(&self, packet_features: Vec<f64>) -> Result<bool> {
+        let mut history = self.packet_history.write().await;
+        if history.len() >= self.window_size {
+            history.pop_front();
+        }
+        history.push_back(packet_features.clone());
+        
+        let aggregated_features = Self::aggregate_features(&history);
+        let (is_threat, _) = self.detector.detect(&aggregated_features)?;
+        if is_threat {
+            warn!("Network anomaly detected with features: {:?}", aggregated_features);
+        }
+        Ok(is_threat)
+    }
+
+    fn aggregate_features(history: &VecDeque<Vec<f64>>) -> Vec<f64> {
+        let mut aggregated = vec![0.0; history.front().unwrap().len()];
+        for packet in history.iter() {
+            for (i, &feature) in packet.iter().enumerate() {
+                aggregated[i] += feature;
+            }
+        }
+        aggregated.iter_mut().for_each(|x| *x /= history.len() as f64);
+        aggregated
+    }
+}

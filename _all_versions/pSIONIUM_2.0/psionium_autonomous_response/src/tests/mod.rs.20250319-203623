@@ -1,0 +1,47 @@
+use super::*;
+use ed25519_dalek::SigningKey;
+use rand::thread_rng;
+use tempfile::TempDir;
+
+#[tokio::test]
+async fn test_full_threat_response_cycle() {
+    let test_dir = TempDir::new().unwrap();
+    let sock_path = test_dir.path().join("ipc.sock");
+    
+    let mut rng = thread_rng();
+    let signing_key = SigningKey::generate(&mut rng);
+    let verifying_key = signing_key.verifying_key();
+    
+    let crypto = PsioniumCrypto::new().unwrap();
+    let detector = ThreatDetector::new(verifying_key);
+    let engine = ResponseEngine::new(crypto, detector, signing_key);
+    
+    let threat_data = vec![30.0, 60.0, 15.0];
+    
+    let result = engine.handle_threat(1234, &threat_data).await;
+    assert!(result.is_ok());
+    
+    // Add verification of system effects here
+}
+
+#[tokio::test]
+async fn test_ipc_security() {
+    let test_dir = TempDir::new().unwrap();
+    let sock_path = test_dir.path().join("ipc.sock");
+    
+    let mut rng = thread_rng();
+    let signing_key = SigningKey::generate(&mut rng);
+    let verifying_key = signing_key.verifying_key();
+    
+    let ipc = IpcChannel::new(verifying_key).await.unwrap();
+    
+    // Test valid signature
+    let data = b"valid data";
+    let sig = signing_key.sign(data);
+    assert!(ipc.send_response(data, &sig.to_bytes()).await.is_ok());
+    
+    // Test invalid signature
+    let mut bad_sig = sig.to_bytes();
+    bad_sig[0] = !bad_sig[0];
+    assert!(ipc.send_response(data, &bad_sig).await.is_err());
+}

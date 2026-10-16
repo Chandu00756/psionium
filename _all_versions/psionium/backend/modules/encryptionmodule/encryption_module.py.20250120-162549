@@ -1,0 +1,154 @@
+from oqs import KeyEncapsulation, Signature
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+import os
+
+class EncryptionModule:
+    def __init__(self):
+        self.supported_algorithms = {
+            "Kyber": "Kyber768",
+            "Dilithium": "Dilithium3",
+            "Falcon": "Falcon-512",
+            "AES-256": "AES-256",
+            "ChaCha20": "ChaCha20",
+        }
+
+    def list_supported_algorithms(self):
+        return list(self.supported_algorithms.keys())
+
+    def encrypt(self, data, algorithm, parameters=None):
+        if algorithm not in self.supported_algorithms:
+            raise ValueError(f"Unsupported algorithm: {algorithm}")
+
+        try:
+            if algorithm == "Kyber":
+                return self._encrypt_kyber(data)
+            elif algorithm == "Dilithium":
+                return self._sign_dilithium(data)
+            elif algorithm == "Falcon":
+                return self._sign_falcon(data)
+            elif algorithm == "AES-256":
+                return self._encrypt_aes(data, parameters)
+            elif algorithm == "ChaCha20":
+                return self._encrypt_chacha20(data, parameters)
+            else:
+                raise ValueError(f"Algorithm not implemented: {algorithm}")
+        except Exception as e:
+            raise RuntimeError(f"Encryption failed: {str(e)}")
+
+    def _encrypt_kyber(self, data):
+        kem = KeyEncapsulation(self.supported_algorithms["Kyber"])
+        public_key = kem.generate_keypair()
+        ciphertext, shared_secret = kem.encap_secret(public_key)
+
+        iv = os.urandom(16)
+        cipher = Cipher(algorithms.AES(shared_secret), modes.GCM(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
+
+        return {
+            "ciphertext": ciphertext,
+            "encrypted_data": encrypted_data,
+            "iv": iv,
+            "tag": encryptor.tag,
+            "public_key": public_key,
+        }
+
+    def _sign_dilithium(self, data):
+        signer = Signature(self.supported_algorithms["Dilithium"])
+        public_key = signer.generate_keypair()
+        signature = signer.sign(data)
+
+        return {
+            "signature": signature,
+            "public_key": public_key,
+        }
+
+    def _sign_falcon(self, data):
+        signer = Signature(self.supported_algorithms["Falcon"])
+        public_key = signer.generate_keypair()
+        signature = signer.sign(data)
+
+        return {
+            "signature": signature,
+            "public_key": public_key,
+        }
+
+    def _encrypt_aes(self, data, key):
+        if not key:
+            key = os.urandom(32)
+        iv = os.urandom(12)
+        cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
+        return {
+            "encrypted_data": encrypted_data,
+            "iv": iv,
+            "tag": encryptor.tag,
+        }
+
+    def _encrypt_chacha20(self, data, key):
+        if not key:
+            key = os.urandom(32)
+        nonce = os.urandom(16)
+        algorithm = algorithms.ChaCha20(key, nonce)
+        cipher = Cipher(algorithm, mode=None, backend=default_backend())
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
+        return {
+            "encrypted_data": encrypted_data,
+            "nonce": nonce,
+        }
+
+    def decrypt(self, encrypted_data, algorithm, parameters=None):
+        if algorithm not in self.supported_algorithms:
+            raise ValueError(f"Unsupported algorithm: {algorithm}")
+
+        try:
+            if algorithm == "Kyber":
+                return self._decrypt_kyber(encrypted_data)
+            elif algorithm == "AES-256":
+                return self._decrypt_aes(encrypted_data, parameters)
+            elif algorithm == "ChaCha20":
+                return self._decrypt_chacha20(encrypted_data, parameters)
+            else:
+                raise ValueError(f"Algorithm not implemented for decryption: {algorithm}")
+        except Exception as e:
+            raise RuntimeError(f"Decryption failed: {str(e)}")
+
+    def _decrypt_kyber(self, encrypted_package):
+        kem = KeyEncapsulation(self.supported_algorithms["Kyber"])
+        shared_secret = kem.decap_secret(encrypted_package["ciphertext"])
+
+        cipher = Cipher(algorithms.AES(shared_secret), modes.GCM(encrypted_package["iv"], encrypted_package["tag"]), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(encrypted_package["encrypted_data"]) + decryptor.finalize()
+
+        return decrypted_data
+
+    def _decrypt_aes(self, encrypted_package, key):
+        if not key:
+            raise ValueError("AES-256 decryption requires a key.")
+        cipher = Cipher(algorithms.AES(key), modes.GCM(encrypted_package["iv"], encrypted_package["tag"]), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(encrypted_package["encrypted_data"]) + decryptor.finalize()
+        return decrypted_data
+
+    def _decrypt_chacha20(self, encrypted_package, key):
+        if not key:
+            raise ValueError("ChaCha20 decryption requires a key.")
+        algorithm = algorithms.ChaCha20(key, encrypted_package["nonce"])
+        cipher = Cipher(algorithm, mode=None, backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(encrypted_package["encrypted_data"]) + decryptor.finalize()
+        return decrypted_data
+
+    def verify_signature(self, data, signature, public_key, algorithm):
+        if algorithm not in ["Dilithium", "Falcon"]:
+            raise ValueError(f"Unsupported signature algorithm: {algorithm}")
+
+        try:
+            signer = Signature(self.supported_algorithms[algorithm])
+            return signer.verify(data, signature, public_key)
+        except Exception as e:
+            raise RuntimeError(f"Signature verification failed: {str(e)}")

@@ -1,0 +1,30 @@
+use sgx_types::sgx_enclave_id_t;
+use crate::utils::PsioniumError;
+use crate::logging::log_operation;
+use log::{info, error};
+
+pub struct PsioniumEnclave {
+    enclave_id: sgx_enclave_id_t,
+    keys: Option<Vec<u8>>,  // Encrypted key blob
+}
+
+impl PsioniumEnclave {
+    pub fn new() -> Result<Self, PsioniumError> {
+        // Placeholder for SGX init; software fallback for now
+        info!("Initializing PsioniumEnclave (software mode)");
+        Ok(PsioniumEnclave {
+            enclave_id: 0,
+            keys: None,
+        })
+    }
+
+    pub fn store_key(&mut self, key_blob: Vec<u8>) -> Result<(), PsioniumError> {
+        self.keys = Some(key_blob);
+        log_operation("store_key", "success", key_blob.len());
+        Ok(())
+    }
+
+    pub fn retrieve_key(&self) -> Result<&Vec<u8>, PsioniumError> {
+        self.keys.as_ref().ok_or(PsioniumError::NoKeys)
+    }
+}

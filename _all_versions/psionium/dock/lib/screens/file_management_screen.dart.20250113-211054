@@ -1,0 +1,315 @@
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_chips_input/flutter_chips_input.dart';
+
+class FileManagementScreen extends StatefulWidget {
+  @override
+  _FileManagementScreenState createState() => _FileManagementScreenState();
+}
+
+class _FileManagementScreenState extends State<FileManagementScreen> {
+  List<FileItem> files = [];
+  List<String> tags = ["Work", "Personal", "Encrypted", "Important"];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text(
+          "File Management",
+          style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.black,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.search, color: Colors.green),
+            onPressed: () {
+              // Open search
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.create_new_folder, color: Colors.green),
+            onPressed: () {
+              _createFolder();
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // File Actions Section
+          _buildFileActionsSection(),
+          SizedBox(height: 10),
+
+          // File List Section
+          Expanded(
+            child: _buildFileListSection(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFileActionsSection() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          ElevatedButton.icon(
+            onPressed: _uploadFiles,
+            icon: Icon(Icons.upload, color: Colors.black),
+            label: Text("Upload Files", style: TextStyle(color: Colors.black)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+          ),
+          SizedBox(width: 10),
+          ElevatedButton.icon(
+            onPressed: _downloadFiles,
+            icon: Icon(Icons.download, color: Colors.black),
+            label: Text("Download Files", style: TextStyle(color: Colors.black)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFileListSection() {
+    return ListView.builder(
+      itemCount: files.length,
+      itemBuilder: (context, index) {
+        return _buildFileItem(files[index]);
+      },
+    );
+  }
+
+  Widget _buildFileItem(FileItem file) {
+    return Card(
+      color: Colors.grey[900],
+      elevation: 4,
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: Icon(
+          file.isFolder ? Icons.folder : Icons.insert_drive_file,
+          color: Colors.green,
+        ),
+        title: Text(
+          file.name,
+          style: TextStyle(color: Colors.white),
+        ),
+        subtitle: Text(
+          file.isFolder ? "Folder" : "${file.size} KB",
+          style: TextStyle(color: Colors.grey),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(Icons.preview, color: Colors.green),
+              onPressed: () {
+                _previewFile(file);
+              },
+            ),
+            IconButton(
+              icon: Icon(Icons.more_vert, color: Colors.green),
+              onPressed: () {
+                _showFileOptions(file);
+              },
+            ),
+          ],
+        ),
+        onTap: () {
+          if (file.isFolder) {
+            // Navigate to folder
+          }
+        },
+      ),
+    );
+  }
+
+  void _uploadFiles() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(allowMultiple: true);
+
+    if (result != null) {
+      setState(() {
+        files.addAll(result.files.map((file) => FileItem(
+          name: file.name,
+          size: file.size ?? 0,
+          isFolder: false,
+        )).toList());
+      });
+    }
+  }
+
+  void _downloadFiles() {
+    // Implement download functionality
+  }
+
+  void _createFolder() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String folderName = '';
+        return AlertDialog(
+          title: Text("Create Folder", style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.grey[900],
+          content: TextField(
+            decoration: InputDecoration(
+              hintText: "Enter folder name",
+              hintStyle: TextStyle(color: Colors.grey),
+            ),
+            style: TextStyle(color: Colors.white),
+            onChanged: (value) {
+              folderName = value;
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text("Cancel", style: TextStyle(color: Colors.green)),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  files.add(FileItem(
+                    name: folderName,
+                    size: 0,
+                    isFolder: true,
+                  ));
+                });
+                Navigator.pop(context);
+              },
+              child: Text("Create", style: TextStyle(color: Colors.green)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _previewFile(FileItem file) {
+    // Implement file preview functionality
+  }
+
+  void _showFileOptions(FileItem file) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      builder: (context) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.edit, color: Colors.green),
+              title: Text("Rename", style: TextStyle(color: Colors.white)),
+              onTap: () {
+                // Implement rename functionality
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete, color: Colors.red),
+              title: Text("Delete", style: TextStyle(color: Colors.white)),
+              onTap: () {
+                setState(() {
+                  files.remove(file);
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.tag, color: Colors.green),
+              title: Text("Add Tags", style: TextStyle(color: Colors.white)),
+              onTap: () {
+                _addTags(file);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _addTags(FileItem file) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Add Tags", style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.grey[900],
+          content: ChipsInput(
+            initialValue: file.tags,
+            decoration: InputDecoration(
+              hintText: "Enter tags",
+              hintStyle: TextStyle(color: Colors.grey),
+            ),
+            findSuggestions: (String query) {
+              if (query.isNotEmpty) {
+                return tags.where((tag) => tag.toLowerCase().contains(query.toLowerCase())).toList();
+              }
+              return [];
+            },
+            onChanged: (value) {
+              file.tags = value;
+            },
+            chipBuilder: (context, state, tag) {
+              return InputChip(
+                label: Text(tag, style: TextStyle(color: Colors.white)),
+                backgroundColor: Colors.green,
+                onDeleted: () {
+                  state.deleteChip(tag);
+                },
+              );
+            },
+            suggestionBuilder: (context, state, tag) {
+              return ListTile(
+                title: Text(tag, style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  state.selectSuggestion(tag);
+                },
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text("Cancel", style: TextStyle(color: Colors.green)),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {});
+                Navigator.pop(context);
+              },
+              child: Text("Save", style: TextStyle(color: Colors.green)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class FileItem {
+  String name;
+  int size;
+  bool isFolder;
+  List<String> tags;
+
+  FileItem({
+    required this.name,
+    required this.size,
+    required this.isFolder,
+    this.tags = const [],
+  });
+}

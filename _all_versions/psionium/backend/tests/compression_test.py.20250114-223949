@@ -1,0 +1,50 @@
+import sys
+import numpy as np
+import time
+import os
+from compression_module import QIACModule
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def test_compression(file_path):
+    with open(file_path, 'rb') as f:
+        data = np.frombuffer(f.read(), dtype=np.uint8)
+    
+    qiac = QIACModule()
+    
+    start_time = time.time()
+    checksum, compressed = qiac.compress(data)
+    compress_time = time.time() - start_time
+    
+    start_time = time.time()
+    decompressed = qiac.decompress(checksum, compressed)
+    decompress_time = time.time() - start_time
+    
+    compression_ratio = len(data) / len(compressed)
+    is_lossless = np.array_equal(data, decompressed)
+    
+    print(f"File: {file_path}")
+    print(f"Original size: {len(data)} bytes")
+    print(f"Compressed size: {len(compressed)} bytes")
+    print(f"Compression ratio: {compression_ratio:.2f}")
+    print(f"Compress time: {compress_time:.4f} seconds")
+    print(f"Decompress time: {decompress_time:.4f} seconds")
+    print(f"Lossless: {is_lossless}")
+    print("---")
+
+def test_various_file_types():
+    test_files = [
+        'sample.txt',
+        'image.jpg',
+        'document.pdf',
+        'audio.mp3',
+        'video.mp4'
+    ]
+    
+    for file in test_files:
+        if os.path.exists(file):
+            test_compression(file)
+        else:
+            print(f"File not found: {file}")
+
+if __name__ == "__main__":
+    test_various_file_types()

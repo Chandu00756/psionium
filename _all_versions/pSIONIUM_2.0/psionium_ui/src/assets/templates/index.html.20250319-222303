@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project Psionium</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Project Psionium Dashboard</h1>
+        <div class="panel" id="dashboard">
+            <h2>Overview</h2>
+            <p>Security Status: <span id="status" class="status-green">Protected</span></p>
+            <p>Threats Blocked: <span id="threats_blocked">5</span></p>
+            <p>Last Update: <span id="last_update">3/20/25</span></p>
+        </div>
+        <div class="panel" id="encryption">
+            <h2>Encryption Engine</h2>
+            <p>Encryption Active: <span id="active">Yes</span></p>
+            <p>Key Strength: <span id="key_strength">4096-bit Kyber</span></p>
+            <p>Files Encrypted: <span id="files_encrypted">1234</span></p>
+        </div>
+        <div class="panel" id="threat_detection">
+            <h2>AI Threat Detection</h2>
+            <p>Threats Detected: <span id="threats_detected">5</span></p>
+            <p>Last Threat: <span id="last_threat">Ransomware, 3/20/25</span></p>
+            <p>Detection Rate: <span id="detection_rate">99.5%</span></p>
+        </div>
+        <div class="panel" id="response">
+            <h2>Autonomous Response</h2>
+            <p>Actions Taken: <span id="actions_taken">3</span></p>
+            <p>Last Action: <span id="last_action">Terminated Process 1234</span></p>
+            <p>Recovery Status: <span id="recovery_status">100%</span></p>
+        </div>
+        <div class="panel" id="compliance">
+            <h2>Compliance & Logging</h2>
+            <p>Compliance Status: <span id="compliance_status" class="status-green">Green</span></p>
+            <p>Last Audit: <span id="last_audit">3/18/25</span></p>
+            <p>Log Size: <span id="log_size">5 MB</span></p>
+        </div>
+        <div class="panel" id="integration">
+            <h2>System Integration</h2>
+            <p>OS: <span id="os">Windows 10</span></p>
+            <p>Integration: <span id="integration">Kernel Module Active</span></p>
+            <p>Footprint: <span id="footprint">45 MB RAM</span></p>
+        </div>
+        <div class="panel" id="update_manager">
+            <h2>Offline Update Manager</h2>
+            <p>Last Update: <span id="last_update">3/1/25</span></p>
+            <p>Threat DB: <span id="threat_db">15K Entries</span></p>
+            <p>Patch Status: <span id="patch_status">Up-to-date</span></p>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>

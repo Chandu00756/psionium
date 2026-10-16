@@ -1,0 +1,271 @@
+import tkinter as tk
+from tkinter import scrolledtext, font
+from systems.encoding_system import EncodingSystem
+from systems.compression_system import CompressionSystem
+
+class PsiONIUMTerminal:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("pSIONIUM Terminal")
+        self.root.geometry("800x600")
+        self.root.configure(bg="black")
+
+        # Custom font for the terminal
+        self.terminal_font = font.Font(family="Courier New", size=12, weight="bold")
+
+        # Create a text area for output
+        self.output_area = scrolledtext.ScrolledText(
+            root,
+            wrap=tk.WORD,
+            state='disabled',
+            bg="black",
+            fg="green",
+            insertbackground="green",
+            font=self.terminal_font
+        )
+        self.output_area.pack(expand=True, fill='both')
+
+        # Bind keyboard events
+        self.output_area.bind("<KeyPress>", self.handle_keypress)
+        self.output_area.bind("<Return>", self.execute_command)
+        self.output_area.bind("<Up>", self.prev_command)
+        self.output_area.bind("<Down>", self.next_command)
+
+        # Initialize systems
+        self.encoding_system = EncodingSystem()
+        self.compression_system = CompressionSystem()
+
+        # Command history
+        self.command_history = []
+        self.history_index = -1
+
+        # Display welcome message
+        self.display_output("Welcome to the pSIONIUM Terminal. Type 'help' for a list of commands.\n")
+        self.display_output("pSIONIUM> ", input_prompt=True)
+
+    def display_output(self, text, input_prompt=False):
+        """
+        Display text in the output area.
+        :param text: Text to display.
+        :param input_prompt: Whether to display an input prompt.
+        """
+        self.output_area.config(state='normal')
+        self.output_area.insert(tk.END, text)
+        self.output_area.config(state='disabled')
+        self.output_area.see(tk.END)  # Scroll to the bottom
+
+        if input_prompt:
+            self.output_area.mark_set(tk.INSERT, tk.END)
+            self.output_area.config(state='normal')
+
+    def handle_keypress(self, event):
+        """
+        Handle keypress events in the terminal.
+        """
+        if event.keysym == "BackSpace":
+            if self.output_area.index(tk.INSERT) != self.output_area.index("end-1c"):
+                return "break"  # Prevent deleting previous output
+        elif event.keysym == "Up" or event.keysym == "Down":
+            return  # Handle up/down arrows separately
+        elif event.keysym == "Left":
+            if self.output_area.index(tk.INSERT) == self.output_area.index("end-1c"):
+                return "break"  # Prevent moving cursor left of the prompt
+        elif event.keysym == "Right":
+            if self.output_area.index(tk.INSERT) == self.output_area.index("end"):
+                return "break"  # Prevent moving cursor right of the prompt
+
+    def execute_command(self, event):
+        """
+        Execute a command entered by the user.
+        """
+        # Get the command from the last line
+        command = self.output_area.get("end-2c linestart", "end-1c").strip()
+        self.display_output("\n")  # Move to the next line
+
+        # Add command to history
+        if command:
+            self.command_history.append(command)
+            self.history_index = len(self.command_history)
+
+        # Parse and execute the command
+        try:
+            if command.startswith("encode"):
+                self.encode_file(command)
+            elif command.startswith("decode"):
+                self.decode_file(command)
+            elif command.startswith("compress"):
+                self.compress_file(command)
+            elif command.startswith("decompress"):
+                self.decompress_file(command)
+            elif command == "help":
+                self.display_help()
+            elif command in ["exit", "quit"]:
+                self.root.destroy()
+            else:
+                self.display_output("Error: Unknown command. Type 'help' for a list of commands.\n")
+        except Exception as e:
+            self.display_output(f"Error: {e}\n")
+
+        # Display the next prompt
+        self.display_output("pSIONIUM> ", input_prompt=True)
+
+    def prev_command(self, event):
+        """
+        Scroll to the previous command in history.
+        """
+        if self.command_history and self.history_index > 0:
+            self.history_index -= 1
+            self.replace_input(self.command_history[self.history_index])
+
+    def next_command(self, event):
+        """
+        Scroll to the next command in history.
+        """
+        if self.command_history and self.history_index < len(self.command_history) - 1:
+            self.history_index += 1
+            self.replace_input(self.command_history[self.history_index])
+        elif self.history_index == len(self.command_history) - 1:
+            self.history_index += 1
+            self.replace_input("")
+
+    def replace_input(self, text):
+        """
+        Replace the current input with the given text.
+        """
+        self.output_area.config(state='normal')
+        self.output_area.delete("end-2c linestart", "end-1c")
+        self.output_area.insert("end-1c", text)
+        self.output_area.config(state='disabled')
+        self.output_area.see(tk.END)
+
+    def encode_file(self, command):
+        """
+        Encode a file.
+        Usage: encode <file> [--type=<encoding_type>]
+        """
+        args = command.split()
+        if len(args) < 2:
+            self.display_output("Error: Missing file path.\n")
+            return
+
+        file_path = args[1]
+        encoding_type = "dynamic"  # Default encoding type
+        if len(args) > 2 and args[2].startswith("--type="):
+            encoding_type = args[2].split("=")[1]
+
+        try:
+            with open(file_path, 'rb') as file:
+                data = file.read()
+
+            encoded_data = self.encoding_system.process(data)
+            output_path = file_path + ".encoded"
+            with open(output_path, 'w') as output_file:
+                output_file.write(encoded_data)
+
+            self.display_output(f"File encoded successfully: {output_path}\n")
+        except Exception as e:
+            self.display_output(f"Error during encoding: {e}\n")
+
+    def decode_file(self, command):
+        """
+        Decode a file.
+        Usage: decode <file> [--type=<encoding_type>]
+        """
+        args = command.split()
+        if len(args) < 2:
+            self.display_output("Error: Missing file path.\n")
+            return
+
+        file_path = args[1]
+        encoding_type = "dynamic"  # Default encoding type
+        if len(args) > 2 and args[2].startswith("--type="):
+            encoding_type = args[2].split("=")[1]
+
+        try:
+            with open(file_path, 'r') as file:
+                encoded_data = file.read()
+
+            decoded_data = self.encoding_system.reverse_process(encoded_data)
+            output_path = file_path.replace(".encoded", ".decoded")
+            with open(output_path, 'wb') as output_file:
+                output_file.write(decoded_data)
+
+            self.display_output(f"File decoded successfully: {output_path}\n")
+        except Exception as e:
+            self.display_output(f"Error during decoding: {e}\n")
+
+    def compress_file(self, command):
+        """
+        Compress a file.
+        Usage: compress <file> [--algorithm=<compression_algorithm>]
+        """
+        args = command.split()
+        if len(args) < 2:
+            self.display_output("Error: Missing file path.\n")
+            return
+
+        file_path = args[1]
+        algorithm = "gzip"  # Default compression algorithm
+        if len(args) > 2 and args[2].startswith("--algorithm="):
+            algorithm = args[2].split("=")[1]
+
+        try:
+            with open(file_path, 'rb') as file:
+                data = file.read()
+
+            compressed_data = self.compression_system.process(data)
+            output_path = file_path + ".compressed"
+            with open(output_path, 'wb') as output_file:
+                output_file.write(compressed_data)
+
+            self.display_output(f"File compressed successfully: {output_path}\n")
+        except Exception as e:
+            self.display_output(f"Error during compression: {e}\n")
+
+    def decompress_file(self, command):
+        """
+        Decompress a file.
+        Usage: decompress <file> [--algorithm=<compression_algorithm>]
+        """
+        args = command.split()
+        if len(args) < 2:
+            self.display_output("Error: Missing file path.\n")
+            return
+
+        file_path = args[1]
+        algorithm = "gzip"  # Default compression algorithm
+        if len(args) > 2 and args[2].startswith("--algorithm="):
+            algorithm = args[2].split("=")[1]
+
+        try:
+            with open(file_path, 'rb') as file:
+                compressed_data = file.read()
+
+            decompressed_data = self.compression_system.reverse_process(compressed_data)
+            output_path = file_path.replace(".compressed", ".decompressed")
+            with open(output_path, 'wb') as output_file:
+                output_file.write(decompressed_data)
+
+            self.display_output(f"File decompressed successfully: {output_path}\n")
+        except Exception as e:
+            self.display_output(f"Error during decompression: {e}\n")
+
+    def display_help(self):
+        """
+        Display help for available commands.
+        """
+        help_text = """
+        Available commands:
+        - encode <file> [--type=<encoding_type>]: Encode a file.
+        - decode <file> [--type=<encoding_type>]: Decode a file.
+        - compress <file> [--algorithm=<compression_algorithm>]: Compress a file.
+        - decompress <file> [--algorithm=<compression_algorithm>]: Decompress a file.
+        - help: Show this help message.
+        - exit/quit: Exit the terminal.
+        """
+        self.display_output(help_text)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    terminal = PsiONIUMTerminal(root)
+    root.mainloop()

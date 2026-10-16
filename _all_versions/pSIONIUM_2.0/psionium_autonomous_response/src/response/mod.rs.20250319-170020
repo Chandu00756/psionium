@@ -1,0 +1,99 @@
+use crate::ipc::IpcChannel;
+use psionium_crypto_engine::crypto::PsioniumCrypto;
+use psionium_ai_threat_detection::detector::{ThreatDetector, AlertSeverity};
+use log::{info, warn, error};
+use ed25519_dalek::{SigningKey, Signer};
+use nix::sys::signal::{kill, Signal};
+use nix::unistd::Pid;
+use tokio::time::{sleep, Duration};
+use anyhow::{Result, anyhow};
+use std::sync::Arc;
+
+// Autonomous Response Engine
+pub struct ResponseEngine {
+    crypto: PsioniumCrypto,
+    detector: ThreatDetector,
+    ipc: Arc<IpcChannel>,
+    signing_key: SigningKey,
+}
+
+impl ResponseEngine {
+    pub fn new(crypto: PsioniumCrypto, detector: ThreatDetector, signing_key: SigningKey) -> Self {
+        let verifying_key = signing_key.verifying_key();
+        let ipc = Arc::new(IpcChannel::new(verifying_key));
+        info!("ResponseEngine initialized with government-grade autonomous capabilities");
+        ResponseEngine {
+            crypto,
+            detector,
+            ipc,
+            signing_key,
+        }
+    }
+
+    pub async fn handle_threat(&self, process_id: i32, threat_data: &[f64]) -> Result<()> {
+        // Step 1: Analyze threat severity
+        let (is_threat, severity) = match self.detector.detect(threat_data) {
+            Ok(true) => (true, AlertSeverity::High),
+            Ok(false) => (false, AlertSeverity::Low),
+            Err(e) => {
+                error!("Threat detection failed: {}", e);
+                return Err(anyhow!("Threat detection error: {}", e));
+            }
+        };
+
+        if !is_threat {
+            info!("No actionable threat detected: {:?}", threat_data);
+            return Ok(());
+        }
+
+        // Step 2: Isolate the threat (e.g., kill malicious process)
+        let pid = Pid::from_raw(process_id);
+        if let Err(e) = kill(pid, Signal::SIGTERM) {
+            error!("Failed to terminate process {}: {}", process_id, e);
+            return Err(anyhow!("Process termination failed: {}", e));
+        }
+        warn!("Process {} terminated due to high-severity threat", process_id);
+
+        // Step 3: Encrypt and log the response
+        let response_log = format!("Terminated process {} due to threat: {:?}", process_id, threat_data);
+        let (ciphertext, encrypted_data, nonce) = self.crypto.encrypt(response_log.as_bytes())?;
+        let log_signature = self.signing_key.sign(&encrypted_data);
+        info!("Encrypted response log generated: {:?}", encrypted_data.len());
+
+        // Step 4: Send encrypted response to other components via IPC
+        self.ipc.send_response(&encrypted_data, log_signature.as_ref()).await?;
+        info!("Response sent to system components via secure IPC");
+
+        // Step 5: Self-healing (e.g., delay to simulate recovery)
+        sleep(Duration::from_secs(1)).await;
+        info!("Self-healing initiated for process {}", process_id);
+
+        Ok(())
+    }
+}
+
+// Error handling enum
+#[derive(Debug)]
+pub enum ThreatError {
+    InvalidInput(String),
+    PredictionFailed(String),
+    InvalidSignature(String),
+    DeserializationFailed(String),
+    TrainingFailed(String),
+    MonitoringFailed(String),
+}
+
+impl std::fmt::Display for ThreatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ThreatError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
+            ThreatError::PredictionFailed(msg) => write!(f, "Prediction failed: {}", msg),
+            ThreatError::InvalidSignature(msg) => write!(f, "Invalid signature: {}", msg),
+            ThreatError::DeserializationFailed(msg) => write!(f, "Deserialization failed: {}", msg),
+            ThreatError::TrainingFailed(msg) => write!(f, "Training failed: {}", msg),
+            ThreatError::MonitoringFailed(msg) => write!(f, "Monitoring failed: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for ThreatError {}

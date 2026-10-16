@@ -1,0 +1,533 @@
+import os
+import platform
+import socket
+import uuid
+import psutil
+import time
+import hashlib
+import time
+import subprocess
+from typing import Dict, Any, List
+import logging
+import secrets
+import json
+import cpuinfo
+import GPUtil
+import requests
+import re
+import locale
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+class UltraSecureDeviceIdentifier:
+    def __init__(self):
+        self.identifiers: Dict[str, Any] = {
+            "Hardware": self.get_hardware_info,
+            "System": self.get_system_info,
+            "User": self.get_user_info,
+            "Process": self.get_process_info,
+            "Time": self.get_time_info,
+            "Entropy": self.get_entropy_info,
+            "FileSystem": self.get_filesystem_info,
+            "Memory": self.get_memory_info,
+            "BIOS": self.get_bios_info,
+            "GPU": self.get_gpu_info,
+            "Virtualization": self.get_virtualization_info,
+            "Performance": self.get_performance_info,
+            "Power": self.get_power_info,
+            "Environment": self.get_environment_info,
+            "Network_Adapters": self.get_network_adapters_info,
+            "Installed_Software": self.get_installed_software,
+            "System_Events": self.get_system_events,
+            "Hardware_Changes": self.get_hardware_changes,
+            "Firmware": self.get_firmware_info,
+            "Motherboard": self.get_motherboard_info,
+            "USB_Devices": self.get_usb_devices,
+            "Audio_Devices": self.get_audio_devices,
+            "Screen_Resolution": self.get_screen_resolution,
+            "Timezone": self.get_timezone_info,
+            "Locale": self.get_locale_info,
+            "Font_Fingerprint": self.get_font_fingerprint,
+            "Browser_Plugins": self.get_browser_plugins,
+            "CPU_Temperature": self.get_cpu_temperature,
+            "Network_Latency": self.get_network_latency,
+        }
+        self.cache: Dict[str, Any] = {}
+
+    def get_identifier(self, name: str) -> Any:
+        if name not in self.cache:
+            try:
+                self.cache[name] = self.identifiers[name]()
+            except Exception as e:
+                logger.error(f"Failed to get {name}: {str(e)}")
+                self.cache[name] = None
+        return self.cache[name]
+
+    def get_hardware_info(self) -> Dict[str, Any]:
+        info = {
+            "cpu": cpuinfo.get_cpu_info(),
+            "machine": platform.machine(),
+            "ram": psutil.virtual_memory().total,
+            "mac_address": ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) for elements in range(0,2*6,2)][::-1]),
+            "processor": platform.processor(),
+            "machine": platform.machine(),
+            "system": platform.system(),
+            "architecture": platform.architecture(),
+        }
+        try:
+            info["disk_serial"] = self.get_disk_serial()
+        except:
+            pass
+        return info
+
+    def get_system_info(self) -> Dict[str, Any]:
+        return {
+            "os": platform.system(),
+            "os_release": platform.release(),
+            "os_version": platform.version(),
+            "python_version": platform.python_version(),
+            "libc_version": platform.libc_ver(),
+            "boot_time": psutil.boot_time(),
+            "platform": platform.platform(aliased=True, terse=False),
+            "uname": platform.uname()._asdict(),
+        }
+
+    def get_user_info(self) -> Dict[str, Any]:
+        return {
+            "username": os.getlogin(),
+            "shell": os.environ.get("SHELL", ""),
+            "home": os.path.expanduser("~"),
+            "cwd": os.getcwd(),
+            "terminal": os.environ.get("TERM", ""),
+            "path": os.environ.get("PATH", ""),
+            "user_id": os.getuid() if hasattr(os, 'getuid') else None,
+            "group_id": os.getgid() if hasattr(os, 'getgid') else None,
+        }
+
+    def get_process_info(self) -> Dict[str, Any]:
+        current_process = psutil.Process()
+        return {
+            "pid": os.getpid(),
+            "ppid": os.getppid(),
+            "num_processes": len(psutil.pids()),
+            "num_threads": current_process.num_threads(),
+            "cpu_percent": current_process.cpu_percent(),
+            "memory_percent": current_process.memory_percent(),
+            "open_files": len(current_process.open_files()),
+            "connections": len(current_process.net_connections()),  # Updated line
+            "create_time": current_process.create_time(),
+        }
+
+    def get_time_info(self) -> Dict[str, Any]:
+        return {
+            "epoch": time.time(),
+            "local_time": time.localtime(),
+            "monotonic": time.monotonic(),
+            "process_time": time.process_time(),
+            "perf_counter": time.perf_counter(),
+            "timezone": time.tzname,
+            "clock": time.clock() if hasattr(time, 'clock') else time.process_time(),
+        }
+
+    def get_entropy_info(self) -> bytes:
+        entropy_sources = [
+            os.urandom(64),
+            secrets.token_bytes(64),
+            str(psutil.cpu_percent()).encode(),
+            str(psutil.virtual_memory().percent).encode(),
+            str(psutil.disk_usage('/').percent).encode(),
+            str(psutil.net_io_counters()).encode(),
+            platform.platform().encode(),
+            socket.gethostname().encode(),
+            str(time.time_ns()).encode(),
+            str(os.times()).encode(),
+            str(psutil.cpu_stats()).encode(),
+            str(psutil.disk_partitions()).encode(),
+            str(uuid.uuid4()).encode(),
+        ]
+        return b''.join(entropy_sources)
+
+    def get_filesystem_info(self) -> Dict[str, Any]:
+        partitions = psutil.disk_partitions()
+        fs_info = {}
+        for partition in partitions:
+            try:
+                usage = psutil.disk_usage(partition.mountpoint)
+                fs_info[partition.device] = {
+                    "mountpoint": partition.mountpoint,
+                    "fstype": partition.fstype,
+                    "total": usage.total,
+                    "used": usage.used,
+                    "free": usage.free,
+                    "percent": usage.percent
+                }
+            except:
+                pass
+        return fs_info
+
+    def get_memory_info(self) -> Dict[str, Any]:
+        vm = psutil.virtual_memory()
+        sm = psutil.swap_memory()
+        return {
+            "virtual": vm._asdict(),
+            "swap": sm._asdict()
+        }
+
+    def get_bios_info(self) -> Dict[str, Any]:
+        if platform.system() == "Linux":
+            try:
+                info = {}
+                with open('/sys/class/dmi/id/bios_vendor', 'r') as f:
+                    info['manufacturer'] = f.read().strip()
+                with open('/sys/class/dmi/id/bios_version', 'r') as f:
+                    info['version'] = f.read().strip()
+                with open('/sys/class/dmi/id/bios_date', 'r') as f:
+                    info['release_date'] = f.read().strip()
+                return info
+            except Exception as e:
+                logger.error(f"Failed to get BIOS info: {str(e)}")
+        return {}
+
+    def get_gpu_info(self) -> List[Dict[str, Any]]:
+        gpu_info = []
+        try:
+            gpus = GPUtil.getGPUs()
+            for gpu in gpus:
+                gpu_info.append({
+                    "id": gpu.id,
+                    "name": gpu.name,
+                    "load": gpu.load,
+                    "free_memory": gpu.memoryFree,
+                    "used_memory": gpu.memoryUsed,
+                    "total_memory": gpu.memoryTotal,
+                    "temperature": gpu.temperature,
+                    "uuid": gpu.uuid
+                })
+        except:
+            pass
+        return gpu_info
+
+    def get_virtualization_info(self) -> Dict[str, Any]:
+        info = {"is_virtual": False, "type": None}
+        try:
+            with open('/sys/devices/virtual/dmi/id/product_name', 'r') as f:
+                product_name = f.read().strip().lower()
+                if any(v in product_name for v in ['vmware', 'virtualbox', 'qemu', 'kvm']):
+                    info["is_virtual"] = True
+                    info["type"] = next(v for v in ['vmware', 'virtualbox', 'qemu', 'kvm'] if v in product_name)
+        except:
+            pass
+        return info
+
+    def get_performance_info(self) -> Dict[str, Any]:
+        return {
+            "cpu_percent": psutil.cpu_percent(interval=0.1),
+            "per_cpu_percent": psutil.cpu_percent(interval=0.1, percpu=True),
+            "memory_usage": psutil.virtual_memory().percent,
+            "disk_usage": psutil.disk_usage('/').percent,
+            "network_io": psutil.net_io_counters()._asdict(),
+            "disk_io": psutil.disk_io_counters()._asdict() if hasattr(psutil, 'disk_io_counters') else None,
+        }
+
+    def get_power_info(self) -> Dict[str, Any]:
+        info = {}
+        try:
+            battery = psutil.sensors_battery()
+            if battery:
+                info["battery_percent"] = battery.percent
+                info["power_plugged"] = battery.power_plugged
+            info["cpu_freq"] = psutil.cpu_freq()._asdict()
+        except:
+            pass
+        return info
+
+    def get_environment_info(self) -> Dict[str, Any]:
+        info = {
+            "virtual_desktop": False,
+            "cloud_environment": None,
+            "env_vars": dict(os.environ),
+        }
+        
+        if "SESSIONNAME" in os.environ and os.environ["SESSIONNAME"].startswith("RDP"):
+            info["virtual_desktop"] = True
+
+        try:
+            requests.get("http://169.254.169.254/latest/meta-data/", timeout=0.1)
+            info["cloud_environment"] = "AWS"
+        except:
+            try:
+                requests.get("http://169.254.169.254/metadata/instance?api-version=2018-10-01", timeout=0.1)
+                info["cloud_environment"] = "Azure"
+            except:
+                try:
+                    requests.get("http://metadata.google.internal/computeMetadata/v1/", timeout=0.1)
+                    info["cloud_environment"] = "Google Cloud"
+                except:
+                    pass
+
+        return info
+
+    def get_network_adapters_info(self) -> Dict[str, Any]:
+        adapters = psutil.net_if_addrs()
+        return {adapter: [addr._asdict() for addr in addrs] for adapter, addrs in adapters.items()}
+
+    def get_installed_software(self) -> List[str]:
+        if platform.system() == "Linux":
+            try:
+                return subprocess.check_output(["dpkg", "--get-selections"]).decode().splitlines()
+            except Exception as e:
+                logger.error(f"Failed to get installed software: {str(e)}")
+        return []
+
+    def get_system_events(self) -> List[str]:
+        if platform.system() == "Linux":
+            try:
+                return subprocess.check_output(["journalctl", "-q", "-b", "-p", "err"]).decode().splitlines()
+            except Exception as e:
+                logger.error(f"Failed to get system events: {str(e)}")
+        return []
+
+    def get_hardware_changes(self) -> Dict[str, Any]:
+        if platform.system() == "Linux":
+            try:
+                changes = {
+                    "usb_devices": self.get_usb_devices(),
+                    "disk_drives": self.get_disk_drives(),
+                }
+                return changes
+            except Exception as e:
+                logger.error(f"Failed to get hardware changes: {str(e)}")
+        return {}
+
+    def get_usb_devices(self) -> List[str]:
+        try:
+            output = subprocess.check_output(["lsusb"]).decode().splitlines()
+            return [line for line in output]
+        except Exception as e:
+            logger.error(f"Failed to get USB devices: {str(e)}")
+            return []
+
+    def get_disk_drives(self) -> List[str]:
+        try:
+            output = subprocess.check_output(["lsblk", "-o", "NAME,SIZE,TYPE,MOUNTPOINT"]).decode().splitlines()
+            return [line for line in output if "disk" in line]  # Filter out only disk entries
+        except Exception as e:
+            logger.error(f"Failed to get disk drives: {str(e)}")
+            return []
+        
+    def get_firmware_info(self) -> Dict[str, Any]:
+        if platform.system() == "Linux":
+            try:
+                return {
+                    "firmware_version": subprocess.check_output(["dmidecode", "-s", "bios-version"]).decode().strip(),
+                    "firmware_release": subprocess.check_output(["dmidecode", "-s", "bios-release-date"]).decode().strip(),
+                }
+            except:
+                pass
+        return {}
+
+    def get_motherboard_info(self) -> Dict[str, Any]:
+        if platform.system() == "Linux":
+            try:
+                return {
+                    "manufacturer": subprocess.check_output(["dmidecode", "-s", "baseboard-manufacturer"]).decode().strip(),
+                    "product_name": subprocess.check_output(["dmidecode", "-s", "baseboard-product-name"]).decode().strip(),
+                    "version": subprocess.check_output(["dmidecode", "-s", "baseboard-version"]).decode().strip(),
+                    "serial_number": subprocess.check_output(["dmidecode", "-s", "baseboard-serial-number"]).decode().strip(),
+                }
+            except:
+                pass
+        return {}
+
+    def get_usb_devices(self) -> List[str]:
+        if platform.system() == "Linux":
+            try:
+                return subprocess.check_output(["lsusb"]).decode().splitlines()
+            except Exception as e:
+                logger.error(f"Failed to get USB devices: {str(e)}")
+        return []
+
+    def get_audio_devices(self) -> List[str]:
+        if platform.system() == "Linux":
+            try:
+                output = subprocess.check_output(["aplay", "-l"]).decode().splitlines()
+                return [line for line in output if "card" in line]
+            except Exception as e:
+                logger.error(f"Failed to get audio devices on Linux: {str(e)}")
+        return []
+
+    def get_screen_resolution(self) -> Dict[str, int]:
+        if platform.system() == "Windows":
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                return {"width": user32.GetSystemMetrics(0), "height": user32.GetSystemMetrics(1)}
+            except:
+                pass
+        elif platform.system() == "Linux":
+            try:
+                output = subprocess.check_output(["xrandr"]).decode()
+                match = re.search(r"current (\d+) x (\d+)", output)
+                if match:
+                    return {"width": int(match.group(1)), "height": int(match.group(2))}
+            except:
+                pass
+        return {}
+
+    def get_timezone_info(self) -> Dict[str, Any]:
+        return {
+            "timezone": time.tzname,
+            "dst": time.daylight,
+            "utc_offset": time.timezone
+        }
+
+    def get_locale_info(self) -> Dict[str, Any]:
+        try:
+            locale.setlocale(locale.LC_ALL, '')  # Set locale to default
+            language = locale.getlocale()[0]  # Get current locale
+            return {"language": language}
+        except Exception as e:
+            logger.error(f"Failed to get locale info: {str(e)}")
+            return {"language": "unknown"}
+            
+
+    def get_font_fingerprint(self) -> List[str]:
+        if platform.system() == "Linux":
+            try:
+                return subprocess.check_output(["fc-list"]).decode().splitlines()
+            except:
+                pass
+        elif platform.system() == "Windows":
+            try:
+                import winreg
+                fonts = []
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") as key:
+                    for i in range(winreg.QueryInfoKey(key)[1]):
+                        try:
+                            name, data, type = winreg.EnumValue(key, i)
+                            fonts.append(name)
+                        except OSError:
+                            break
+                return fonts
+            except:
+                pass
+        return []
+
+    def get_browser_plugins(self) -> List[str]:
+        # This is a placeholder. In reality, getting browser plugins requires browser integration.
+        return ["This feature requires browser integration"]
+
+    def get_cpu_temperature(self) -> float:
+        if platform.system() == "Linux":
+            try:
+                temp = psutil.sensors_temperatures()
+                if 'coretemp' in temp:
+                    return temp['coretemp'][0].current
+            except:
+                pass
+        return 0.0
+
+    def get_network_latency(self) -> Dict[str, float]:
+        latencies = {}
+        hosts = ['8.8.8.8', '1.1.1.1', 'google.com']
+        for host in hosts:
+            try:
+                start = time.time()
+                socket.create_connection((host, 80), timeout=2)
+                latency = time.time() - start
+                latencies[host] = latency
+            except:
+                latencies[host] = -1
+        return latencies
+
+    def get_disk_serial(self) -> str:
+        if platform.system() == "Linux":
+            try:
+                output = subprocess.check_output(["udevadm", "info", "--query=property", "--name=/dev/sda"]).decode()
+                for line in output.split('\n'):
+                    if "ID_SERIAL=" in line:
+                        return line.split('=')[1].strip()
+            except Exception as e:
+                logger.error(f"Failed to get disk serial on Linux: {str(e)}")
+        return ""
+
+    def entropy_augmentation(self, data: bytes) -> bytes:
+        augmented = bytearray(data)
+        for i in range(len(augmented)):
+            augmented[i] ^= secrets.randbits(8)
+            augmented[i] = (augmented[i] + int(time.time() * 1000000)) % 256
+        return bytes(augmented)
+
+    def gather_identifiers(self):
+        num_identifiers = len(self.identifiers)
+        selected_ids = (num_identifiers // 2) + 1  # Select half + 1 for faster processing
+
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(self.get_identifier, name): name for i, name in enumerate(self.identifiers.keys()) if i < selected_ids}
+            results = {}
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    results[name] = future.result()
+                except Exception as e:
+                    logger.error(f"Error retrieving {name}: {str(e)}")
+                    results[name] = None
+        return results
+    
+    def generate_device_fingerprint(self) -> bytes:
+        gathered_data = self.gather_identifiers()
+        
+        fingerprint_data = b''
+        for data in gathered_data.values():
+            if isinstance(data, dict):
+                fingerprint_data += json.dumps(data, sort_keys=True).encode()
+            elif isinstance(data, list):
+                fingerprint_data += json.dumps(sorted(data)).encode()
+            elif isinstance(data, bytes):
+                fingerprint_data += data
+        
+        augmented_data = self.entropy_augmentation(fingerprint_data)
+        
+        return hashlib.sha3_256(augmented_data).digest()
+
+    def generate_device_key(self) -> bytes:
+        fingerprint = self.generate_device_fingerprint()
+        
+        augmented_fingerprint = self.entropy_augmentation(fingerprint)
+        
+        return hashlib.blake2b(augmented_fingerprint, digest_size=32).digest()
+
+    def generate_device_key(self) -> bytes:
+        fingerprint = self.generate_device_fingerprint()
+        # Apply another round of entropy augmentation
+        augmented_fingerprint = self.entropy_augmentation(fingerprint)
+        # Use BLAKE2b for the final key generation
+        return hashlib.blake2b(augmented_fingerprint, digest_size=32).digest()
+    
+#Usage
+
+if __name__ == "__main__":
+    try:
+        device_id_generator = UltraSecureDeviceIdentifier()
+        
+        # Generate a single device key
+        device_key = device_id_generator.generate_device_key()
+        
+        # Convert the binary key to a hexadecimal string for easier handling
+        hex_key = device_key.hex()
+        
+        print("Final Device Key (Hex):")
+        print(hex_key)
+        
+        # If you need the key in base64 format, you can use the following:
+        import base64
+        base64_key = base64.b64encode(device_key).decode('utf-8')
+        print("\nFinal Device Key (Base64):")
+        print(base64_key)
+        
+    except Exception as e:
+        logger.error(f"Failed to generate device information: {str(e)}")
+
+    pass

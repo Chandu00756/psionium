@@ -1,0 +1,97 @@
+import os
+import json
+import numpy as np
+import sys
+
+# Add the parent directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from modules.compression_module import QIACModule
+
+class CompressionSystem:
+    def __init__(self):
+        self.qiac_module = QIACModule()
+        self.config = self._load_config()
+
+    def _load_config(self):
+        config_path = os.path.join(os.path.dirname(__file__), 'config', 'compression_config.json')
+        try:
+            with open(config_path, 'r') as config_file:
+                return json.load(config_file)
+        except FileNotFoundError:
+            print(f"Config file not found at {config_path}. Using default configuration.")
+            return self._create_default_config()
+
+    def _create_default_config(self):
+        default_config = {
+            "max_compression_level": 5,
+            "default_output_format": "binary",
+            "use_ai_optimization": True,
+            "quantum_resistant": True
+        }
+        config_dir = os.path.join(os.path.dirname(__file__), 'config')
+        os.makedirs(config_dir, exist_ok=True)
+        config_path = os.path.join(config_dir, 'compression_config.json')
+        with open(config_path, 'w') as config_file:
+            json.dump(default_config, config_file, indent=2)
+        return default_config
+
+    def process_data(self, data, operation, output_path=None):
+        if operation == 'compress':
+            compressed_data = self.qiac_module.compress(data, self.config['max_compression_level'], self.config['use_ai_optimization'])
+            if output_path:
+                self._save_compressed_data(compressed_data, output_path)
+            return compressed_data
+        elif operation == 'decompress':
+            return self.qiac_module.decompress(data)
+        else:
+            raise ValueError("Invalid operation. Use 'compress' or 'decompress'.")
+
+    def _save_compressed_data(self, compressed_data, output_path):
+        with open(output_path, 'wb') as f:
+            f.write(compressed_data.tobytes())
+
+    def get_compression_stats(self, original_data, compressed_data):
+        original_size = len(original_data)
+        compressed_size = len(compressed_data)
+        compression_ratio = original_size / compressed_size
+        space_saving = (1 - (compressed_size / original_size)) * 100
+
+        return {
+            'original_size': original_size,
+            'compressed_size': compressed_size,
+            'compression_ratio': compression_ratio,
+            'space_saving_percentage': space_saving
+        }
+
+    def update_config(self, new_config):
+        self.config.update(new_config)
+        config_path = os.path.join(os.path.dirname(__file__), 'config', 'compression_config.json')
+        with open(config_path, 'w') as config_file:
+            json.dump(self.config, config_file, indent=2)
+
+    def get_system_status(self):
+        return {
+            'status': 'operational',
+            'module_version': getattr(self.qiac_module.__class__, '__version__', 'Unknown'),
+            'config': self.config,
+            'quantum_resistant': self.config['quantum_resistant']
+        }
+
+if __name__ == '__main__':
+    compression_system = CompressionSystem()
+    
+    sample_data = np.random.bytes(1000)
+    sample_data = np.frombuffer(sample_data, dtype=np.uint8)
+    
+    compressed = compression_system.process_data(sample_data, 'compress', 'compressed_output.bin')
+    
+    stats = compression_system.get_compression_stats(sample_data, compressed)
+    print("Compression Stats:", stats)
+    
+    decompressed = compression_system.process_data(compressed, 'decompress')
+    
+    print("Data integrity maintained:", np.array_equal(sample_data, decompressed))
+    
+    compression_system.update_config({'max_compression_level': 9, 'use_ai_optimization': True})
+    
+    print("System Status:", compression_system.get_system_status())

@@ -1,0 +1,50 @@
+use ed25519_dalek::{VerifyingKey, Signature, Verifier};
+use tokio::net::UnixStream;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use log::{info, error};
+use std::sync::Arc;
+
+// Encrypted Inter-Process Communication Channel
+pub struct IpcChannel {
+    verifying_key: VerifyingKey,
+}
+
+impl IpcChannel {
+    pub fn new(verifying_key: VerifyingKey) -> Self {
+        info!("Initialized government-grade IPC channel with zero-trust authentication");
+        IpcChannel { verifying_key }
+    }
+
+    pub async fn send_response(&self, data: &[u8], signature: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        // Verify signature before sending
+        let signature = Signature::from_bytes(signature)?;
+        self.verifying_key.verify(data, &signature)
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {}", e))?;
+
+        // Connect to a Unix socket (e.g., for Component 1 or 2)
+        let mut stream = UnixStream::connect("/tmp/psionium_ipc.sock").await?;
+        let msg = [data, signature].concat();
+        stream.write_all(&msg).await?;
+        info!("Sent encrypted response over IPC channel");
+        Ok(())
+    }
+
+    pub async fn receive_response(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let mut stream = UnixStream::connect("/tmp/psionium_ipc.sock").await?;
+        let mut buffer = vec![0u8; 1024];
+        let n = stream.read(&mut buffer).await?;
+        let received_data = buffer[..n].to_vec();
+
+        // Split data and signature (assuming data is first part, signature is last 64 bytes)
+        if received_data.len() < 64 {
+            return Err(anyhow::anyhow!("Received data too short for signature").into());
+        }
+        let (data, signature_bytes) = received_data.split_at(received_data.len() - 64);
+        let signature = Signature::from_bytes(signature_bytes)?;
+        self.verifying_key.verify(data, &signature)
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {}", e))?;
+
+        info!("Received and verified response over IPC channel");
+        Ok(data.to_vec())
+    }
+}

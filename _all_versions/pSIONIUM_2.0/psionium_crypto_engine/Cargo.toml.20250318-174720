@@ -1,0 +1,17 @@
+[package]
+name = "psionium_crypto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+oqs = "0.10.0"          # OpenQuantumSafe for Kyber
+rand = "0.8.5"          # NIST-approved entropy
+sgx_types = "1.1.1"     # Adjusted to latest available
+sgx_tstd = "1.1.1"      # Adjusted to latest available
+
+[dev-dependencies]
+criterion = "0.5.1"     # Benchmarking
+
+[[bench]]
+name = "crypto_bench"
+harness = false

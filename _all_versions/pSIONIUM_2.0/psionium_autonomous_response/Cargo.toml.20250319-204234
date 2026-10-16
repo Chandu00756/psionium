@@ -1,0 +1,32 @@
+[package]
+name = "psionium_autonomous_response"
+version = "0.1.0"
+edition = "2021"
+description = "Quantum-resistant autonomous response system with AI-driven threat mitigation"
+license = "MIT"
+
+[dependencies]
+psionium_crypto_engine = { path = "../psionium_crypto_engine", features = ["quantum-resistant"] }
+psionium_ai_threat_detection = { path = "../psionium_ai_threat_detection" }
+tokio = { version = "1.37", features = ["full", "rt-multi-thread"] }
+log = "0.4"
+ed25519-dalek = { version = "2.1.1", features = ["serde"] }
+nix = { version = "0.27.1", features = ["signal", "process"] }
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
+constant-time-eq = "0.3.0"
+thiserror = "1.0"
+tempfile = "3.10"
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["async_tokio"] }
+tokio = { version = "1.37", features = ["rt", "macros"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+[[bench]]
+name = "response_bench"
+harness = false

@@ -1,0 +1,68 @@
+from flask import Flask, request, jsonify
+import sys
+import os
+from systems.encoding_system import EncodingSystem
+from systems.compression_system import CompressionSystem
+
+# Add the project root directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+app = Flask(__name__)
+
+encoding_system = EncodingSystem()
+compression_system = CompressionSystem()
+
+@app.route("/execute", methods=["POST"])
+def execute_command():
+    data = request.json
+    command = data.get("command")
+    args = data.get("args", {})
+
+    try:
+        if command == "encode":
+            file_path = args.get("file")
+            encoding_type = args.get("type", "dynamic")
+            with open(file_path, 'rb') as file:
+                data = file.read()
+            encoded_data = encoding_system.process(data)
+            output_path = file_path + ".encoded"
+            with open(output_path, 'w') as output_file:
+                output_file.write(encoded_data)
+            return jsonify({"output": f"File encoded successfully: {output_path}"})
+        elif command == "decode":
+            file_path = args.get("file")
+            encoding_type = args.get("type", "dynamic")
+            with open(file_path, 'r') as file:
+                encoded_data = file.read()
+            decoded_data = encoding_system.reverse_process(encoded_data)
+            output_path = file_path.replace(".encoded", ".decoded")
+            with open(output_path, 'wb') as output_file:
+                output_file.write(decoded_data)
+            return jsonify({"output": f"File decoded successfully: {output_path}"})
+        elif command == "compress":
+            file_path = args.get("file")
+            algorithm = args.get("algorithm", "gzip")
+            with open(file_path, 'rb') as file:
+                data = file.read()
+            compressed_data = compression_system.process(data)
+            output_path = file_path + ".compressed"
+            with open(output_path, 'wb') as output_file:
+                output_file.write(compressed_data)
+            return jsonify({"output": f"File compressed successfully: {output_path}"})
+        elif command == "decompress":
+            file_path = args.get("file")
+            algorithm = args.get("algorithm", "gzip")
+            with open(file_path, 'rb') as file:
+                compressed_data = file.read()
+            decompressed_data = compression_system.reverse_process(compressed_data)
+            output_path = file_path.replace(".compressed", ".decompressed")
+            with open(output_path, 'wb') as output_file:
+                output_file.write(decompressed_data)
+            return jsonify({"output": f"File decompressed successfully: {output_path}"})
+        else:
+            return jsonify({"output": "Error: Unknown command. Type 'help' for a list of commands."})
+    except Exception as e:
+        return jsonify({"output": f"Error: {str(e)}"})
+
+if __name__ == "__main__":
+    app.run(debug=True)

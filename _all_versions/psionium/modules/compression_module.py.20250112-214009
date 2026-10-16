@@ -1,0 +1,36 @@
+import gzip
+import zlib
+
+class CompressionModule:
+    def __init__(self, algorithm="gzip"):
+        """
+        Initialize the compression module.
+        :param algorithm: Compression algorithm (default: gzip).
+        """
+        self.algorithm = algorithm
+
+    def compress(self, data):
+        """
+        Compress the input data.
+        :param data: Raw data (bytes).
+        :return: Compressed data (bytes).
+        """
+        if self.algorithm == "gzip":
+            return gzip.compress(data)
+        elif self.algorithm == "zlib":
+            return zlib.compress(data)
+        else:
+            raise ValueError(f"Unsupported compression algorithm: {self.algorithm}")
+
+    def decompress(self, compressed_data):
+        """
+        Decompress the input data.
+        :param compressed_data: Compressed data (bytes).
+        :return: Decompressed data (bytes).
+        """
+        if self.algorithm == "gzip":
+            return gzip.decompress(compressed_data)
+        elif self.algorithm == "zlib":
+            return zlib.decompress(compressed_data)
+        else:
+            raise ValueError(f"Unsupported compression algorithm: {self.algorithm}")

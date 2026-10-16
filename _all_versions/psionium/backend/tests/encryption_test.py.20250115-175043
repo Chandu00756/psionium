@@ -1,0 +1,128 @@
+import sys
+import os
+import base64
+import time
+import pytest
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'modules'))
+
+from encryptionmodule.encryption_module import EncryptionModule
+
+encryption_module = EncryptionModule()
+
+def generate_key_from_password(password: str, salt: bytes) -> bytes:
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    return kdf.derive(password.encode())
+
+data = b"Hello, Psionium!"
+password = "SuperSecretPassword123!"
+salt = os.urandom(16)
+key = generate_key_from_password(password, salt)
+
+def test_kyber():
+    print("\nTesting Kyber...")
+    try:
+        encrypted_package = encryption_module.encrypt(data, "Kyber")
+        decrypted_data = encryption_module.decrypt(encrypted_package, "Kyber")
+        assert decrypted_data == data, "Kyber decryption failed"
+        print("Kyber Decrypted Data (base64):", base64.b64encode(decrypted_data).decode('utf-8'))
+    except Exception as e:
+        pytest.fail(f"Kyber test failed: {e}")
+
+def test_aes_256():
+    print("\nTesting AES-256...")
+    try:
+        encrypted_data = encryption_module.encrypt(data, "AES-256", key)
+        decrypted_data = encryption_module.decrypt(encrypted_data, "AES-256", key)
+        assert decrypted_data == data, "AES-256 decryption failed"
+        print("AES-256 Decrypted Data:", decrypted_data.decode('utf-8'))
+    except Exception as e:
+        pytest.fail(f"AES-256 test failed: {e}")
+
+def test_chacha20():
+    print("\nTesting ChaCha20...")
+    try:
+        encrypted_data = encryption_module.encrypt(data, "ChaCha20", key)
+        decrypted_data = encryption_module.decrypt(encrypted_data, "ChaCha20", key)
+        assert decrypted_data == data, "ChaCha20 decryption failed"
+        print("ChaCha20 Decrypted Data:", decrypted_data.decode('utf-8'))
+    except Exception as e:
+        pytest.fail(f"ChaCha20 test failed: {e}")
+
+def test_empty_data():
+    print("\nTesting Empty Data...")
+    empty_data = b""
+    try:
+        encrypted_data = encryption_module.encrypt(empty_data, "AES-256", key)
+        decrypted_data = encryption_module.decrypt(encrypted_data, "AES-256", key)
+        assert decrypted_data == empty_data, "AES-256 failed with empty data"
+        print("AES-256 Empty Data Test Passed")
+    except Exception as e:
+        pytest.fail(f"AES-256 Empty Data Test Failed: {e}")
+
+def test_large_data():
+    print("\nTesting Large Data...")
+    large_data = b"A" * 1024 * 1024
+    try:
+        start_time = time.time()
+        encrypted_data = encryption_module.encrypt(large_data, "ChaCha20", key)
+        decrypted_data = encryption_module.decrypt(encrypted_data, "ChaCha20", key)
+        end_time = time.time()
+        assert decrypted_data == large_data, "ChaCha20 failed with large data"
+        print(f"ChaCha20 Large Data Test Passed (Time: {end_time - start_time:.2f} seconds)")
+    except Exception as e:
+        pytest.fail(f"ChaCha20 Large Data Test Failed: {e}")
+
+def test_invalid_key():
+    print("\nTesting Invalid Key...")
+    invalid_key = b"invalid_key"
+    try:
+        encrypted_data = encryption_module.encrypt(data, "AES-256", invalid_key)
+        decrypted_data = encryption_module.decrypt(encrypted_data, "AES-256", invalid_key)
+        pytest.fail("Invalid key test failed (expected an error)")
+    except ValueError as e:
+        print("Invalid Key Test Passed:", e)
+
+def test_corrupted_data():
+    print("\nTesting Corrupted Data...")
+    try:
+        encrypted_data = encryption_module.encrypt(data, "AES-256", key)
+        corrupted_data = encrypted_data[:-10] + os.urandom(10)
+        decrypted_data = encryption_module.decrypt(corrupted_data, "AES-256", key)
+        pytest.fail("Corrupted data test failed (expected an error)")
+    except Exception as e:
+        print("Corrupted Data Test Passed:", e)
+
+def test_performance():
+    print("\nTesting Performance...")
+    test_data = b"A" * 1024 * 1024
+    algorithms = ["AES-256", "ChaCha20"]
+    for algorithm in algorithms:
+        try:
+            start_time = time.time()
+            encrypted_data = encryption_module.encrypt(test_data, algorithm, key)
+            encryption_time = time.time() - start_time
+            start_time = time.time()
+            decrypted_data = encryption_module.decrypt(encrypted_data, algorithm, key)
+            decryption_time = time.time() - start_time
+            assert decrypted_data == test_data, f"{algorithm} decryption failed"
+            print(f"{algorithm} Performance: Encryption={encryption_time:.2f}s, Decryption={decryption_time:.2f}s")
+        except Exception as e:
+            pytest.fail(f"{algorithm} Performance Test Failed: {e}")
+
+if __name__ == "__main__":
+    test_kyber()
+    test_aes_256()
+    test_chacha20()
+    test_empty_data()
+    test_large_data()
+    test_invalid_key()
+    test_corrupted_data()
+    test_performance()

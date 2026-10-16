@@ -1,0 +1,24 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'systems'))
+from encryption_system import EncryptionSystem
+
+# Initialize the system
+encryption_system = EncryptionSystem()
+
+# List supported algorithms
+print("Supported Algorithms:", encryption_system.encryption_module.list_supported_algorithms())
+
+# Encrypt data using Kyber (Post-Quantum)
+data = b"Hello, Psionium!"
+encrypted_data = encryption_system.encrypt_data(data, "Kyber")
+print("Encrypted Data (Kyber):", encrypted_data)
+
+# Encrypt data using AES-256 (Traditional)
+encrypted_data = encryption_system.encrypt_data(data, "AES-256")
+print("Encrypted Data (AES-256):", encrypted_data)
+
+# Encrypt data using Dilithium (Post-Quantum Signature)
+signature = encryption_system.encrypt_data(data, "Dilithium")
+print("Digital Signature (Dilithium):", signature)
+print(sys.path)

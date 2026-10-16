@@ -1,0 +1,60 @@
+use memsec::{malloc, mprotect, memzero, free};
+use crate::utils::PsioniumError;
+use crate::logging::log_operation;
+use log::info;
+
+pub struct PsioniumEnclave {
+    key_ptr: *mut u8,  // Pointer to secure memory
+    capacity: usize,   // Total allocated size
+    len: usize,        // Length of stored keys
+}
+
+impl PsioniumEnclave {
+    pub fn new() -> Result<Self, PsioniumError> {
+        info!("Initializing PsioniumEnclave with secure memory");
+        // Allocate 4096 bytes (adjustable later)
+        let capacity = 4096;
+        let key_ptr = unsafe { malloc(capacity) };
+        if key_ptr.is_null() {
+            return Err(PsioniumError::EnclaveInit("Memory allocation failed".into()));
+        }
+        // Protect memory: read/write only for this process
+        unsafe {
+            mprotect(key_ptr, capacity, libc::PROT_READ | libc::PROT_WRITE)
+                .map_err(|e| PsioniumError::EnclaveInit(format!("mprotect failed: {}", e)))?;
+        }
+        Ok(PsioniumEnclave {
+            key_ptr,
+            capacity,
+            len: 0,
+        })
+    }
+
+    pub fn store_key(&mut self, key_blob: Vec<u8>) -> Result<(), PsioniumError> {
+        if key_blob.len() > self.capacity {
+            return Err(PsioniumError::EnclaveInit("Key blob too large for vault".into()));
+        }
+        unsafe {
+            std::ptr::copy_nonoverlapping(key_blob.as_ptr(), self.key_ptr, key_blob.len());
+        }
+        self.len = key_blob.len();
+        log_operation("store_key", "success", self.len);
+        Ok(())
+    }
+
+    pub fn retrieve_key(&self) -> Result<&[u8], PsioniumError> {
+        unsafe {
+            Ok(std::slice::from_raw_parts(self.key_ptr, self.len))
+        }
+    }
+}
+
+impl Drop for PsioniumEnclave {
+    fn drop(&mut self) {
+        unsafe {
+            memzero(self.key_ptr, self.len);
+            free(self.key_ptr);
+        }
+        info!("Enclave keys securely wiped and memory freed");
+    }
+}

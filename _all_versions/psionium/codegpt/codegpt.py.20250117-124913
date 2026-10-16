@@ -1,0 +1,154 @@
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+import subprocess
+import sys
+import os
+import tkinter as tk
+from tkinter import scrolledtext, messagebox
+
+# Constants
+TEMP_CODE_FILE = "temp_code.py"
+MAX_TOKENS = 500
+TEMPERATURE = 0.7  # Adjusted for better results with CodeParrot
+
+class CodeGPT:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("CodeGPT - The Ultimate Python Transcendence")
+        self.root.geometry("800x600")
+
+        # Load CodeParrot model and tokenizer
+        self.model_name = "codeparrot/codeparrot-small"
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
+
+        # UI Elements
+        self.create_widgets()
+
+    def create_widgets(self):
+        """Create and arrange UI elements."""
+        # Input Label
+        self.input_label = tk.Label(self.root, text="Enter your coding task:", font=("Arial", 12))
+        self.input_label.pack(pady=10)
+
+        # Input Text Box
+        self.input_text = scrolledtext.ScrolledText(self.root, width=80, height=10, font=("Arial", 12))
+        self.input_text.pack(pady=10)
+
+        # Advanced Options Frame
+        self.advanced_frame = tk.LabelFrame(self.root, text="Advanced Options", font=("Arial", 12))
+        self.advanced_frame.pack(pady=10, fill="x", padx=10)
+
+        # Max Tokens Option
+        self.max_tokens_label = tk.Label(self.advanced_frame, text="Max Tokens:", font=("Arial", 10))
+        self.max_tokens_label.grid(row=0, column=0, padx=5, pady=5)
+        self.max_tokens_entry = tk.Entry(self.advanced_frame, width=10, font=("Arial", 10))
+        self.max_tokens_entry.insert(0, str(MAX_TOKENS))
+        self.max_tokens_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        # Temperature Option
+        self.temperature_label = tk.Label(self.advanced_frame, text="Temperature:", font=("Arial", 10))
+        self.temperature_label.grid(row=0, column=2, padx=5, pady=5)
+        self.temperature_entry = tk.Entry(self.advanced_frame, width=10, font=("Arial", 10))
+        self.temperature_entry.insert(0, str(TEMPERATURE))
+        self.temperature_entry.grid(row=0, column=3, padx=5, pady=5)
+
+        # Generate Button
+        self.generate_button = tk.Button(self.root, text="Generate Code", font=("Arial", 12), command=self.generate_code)
+        self.generate_button.pack(pady=10)
+
+        # Output Label
+        self.output_label = tk.Label(self.root, text="Generated Code:", font=("Arial", 12))
+        self.output_label.pack(pady=10)
+
+        # Output Text Box
+        self.output_text = scrolledtext.ScrolledText(self.root, width=80, height=15, font=("Arial", 12))
+        self.output_text.pack(pady=10)
+
+        # Execute Button
+        self.execute_button = tk.Button(self.root, text="Execute Code", font=("Arial", 12), command=self.execute_code)
+        self.execute_button.pack(pady=10)
+
+        # Execution Output Label
+        self.execution_output_label = tk.Label(self.root, text="Execution Output:", font=("Arial", 12))
+        self.execution_output_label.pack(pady=10)
+
+        # Execution Output Text Box
+        self.execution_output_text = scrolledtext.ScrolledText(self.root, width=80, height=10, font=("Arial", 12))
+        self.execution_output_text.pack(pady=10)
+
+    def generate_code(self):
+        """Generate Python code using CodeParrot."""
+        try:
+            # Get user input
+            prompt = self.input_text.get("1.0", tk.END).strip()
+            if not prompt:
+                messagebox.showwarning("Input Error", "Please enter a coding task.")
+                return
+
+            # Get advanced options
+            max_tokens = int(self.max_tokens_entry.get())
+            temperature = float(self.temperature_entry.get())
+
+            # Tokenize the input prompt
+            inputs = self.tokenizer(prompt, return_tensors="pt")
+
+            # Generate code using CodeParrot
+            outputs = self.model.generate(
+                inputs.input_ids,
+                max_length=max_tokens,
+                temperature=temperature,
+                num_return_sequences=1,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
+
+            # Decode the generated code
+            code = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+            # Display generated code
+            self.output_text.delete("1.0", tk.END)
+            self.output_text.insert(tk.END, code)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to generate code: {e}")
+
+    def execute_code(self):
+        """Execute the generated Python code."""
+        try:
+            # Get generated code
+            code = self.output_text.get("1.0", tk.END).strip()
+            if not code:
+                messagebox.showwarning("Input Error", "No code to execute.")
+                return
+
+            # Write the code to a temporary file
+            with open(TEMP_CODE_FILE, "w") as f:
+                f.write(code)
+
+            # Execute the code and capture output
+            result = subprocess.run(
+                [sys.executable, TEMP_CODE_FILE],
+                capture_output=True,
+                text=True,
+                timeout=10  # Set a timeout to prevent infinite loops
+            )
+
+            # Display execution output
+            self.execution_output_text.delete("1.0", tk.END)
+            if result.returncode == 0:
+                self.execution_output_text.insert(tk.END, result.stdout)
+            else:
+                self.execution_output_text.insert(tk.END, result.stderr)
+        except subprocess.TimeoutExpired:
+            messagebox.showerror("Execution Error", "Execution timed out. Possible infinite loop.")
+        except Exception as e:
+            messagebox.showerror("Execution Error", f"Failed to execute code: {e}")
+        finally:
+            # Clean up the temporary file
+            if os.path.exists(TEMP_CODE_FILE):
+                os.remove(TEMP_CODE_FILE)
+
+# Main Application
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = CodeGPT(root)
+    root.mainloop()

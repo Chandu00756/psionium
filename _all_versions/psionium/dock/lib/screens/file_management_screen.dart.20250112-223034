@@ -1,0 +1,28 @@
+import 'package:flutter/material.dart';
+
+class FileManagementScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("File Management"),
+      ),
+      body: ListView(
+        children: [
+          ListTile(
+            title: Text("Upload File"),
+            onTap: () {
+              // Implement file upload
+            },
+          ),
+          ListTile(
+            title: Text("Download File"),
+            onTap: () {
+              // Implement file download
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}

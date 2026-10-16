@@ -1,0 +1,80 @@
+#[cfg(test)]
+mod tests {
+    use crate::response::ResponseEngine;
+    use crate::ipc::IpcChannel;
+    use psionium_crypto_engine::crypto::PsioniumCrypto;
+    use psionium_ai_threat_detection::detector::ThreatDetector;
+    use ed25519_dalek::{SigningKey, Signer};
+    use log::info;
+    use rand::RngCore;
+    use rand::thread_rng;
+    use std::sync::{Arc, Once};
+    use tokio::test as tokio_test;
+
+    // Static Once instance to ensure logger is initialized only once
+    static INIT_LOGGER: Once = Once::new();
+
+    // Setup function to initialize the logger safely
+    fn setup_logger() {
+        INIT_LOGGER.call_once(|| {
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                .init();
+        });
+    }
+
+    #[tokio_test]
+    async fn test_handle_threat_success() {
+        setup_logger();
+        let mut rng = thread_rng();
+        let mut secret = [0u8; 32];
+        rng.fill_bytes(&mut secret);
+        let signing_key = SigningKey::from_bytes(&secret);
+        let crypto = PsioniumCrypto::new().expect("Crypto init failed");
+        let detector = ThreatDetector::new(signing_key.verifying_key());
+        let engine = ResponseEngine::new(crypto, detector, signing_key);
+
+        let threat_data = vec![15.0, 30.0, 7.0]; // Simulated threat data
+        let result = engine.handle_threat(1234, &threat_data).await;
+
+        // Expect an error since PID 1234 likely doesn’t exist in the test environment
+        assert!(
+            result.is_err(),
+            "Expected error due to non-existent process, got {:?}",
+            result
+        );
+        if let Err(e) = result {
+            assert!(
+                e.to_string().contains("Process termination failed"),
+                "Unexpected error: {}",
+                e
+            );
+        }
+        info!("Threat handling test passed with expected error");
+    }
+
+    #[tokio_test]
+    async fn test_ipc_send_receive() {
+        setup_logger();
+        let mut rng = thread_rng();
+        let mut secret = [0u8; 32];
+        rng.fill_bytes(&mut secret);
+        let signing_key = SigningKey::from_bytes(&secret);
+        let verifying_key = signing_key.verifying_key();
+        let ipc = Arc::new(IpcChannel::new(verifying_key));
+
+        let data = b"Test IPC message";
+        let signature = signing_key.sign(data);
+
+        let send_result = ipc.send_response(data, &signature.to_bytes()).await;
+        assert!(send_result.is_ok(), "IPC send failed: {:?}", send_result);
+
+        let received_data = ipc.receive_response().await;
+        assert!(received_data.is_ok(), "IPC receive failed: {:?}", received_data);
+        assert_eq!(
+            received_data.unwrap(),
+            data,
+            "Received data does not match sent data"
+        );
+        info!("IPC send/receive test passed successfully");
+    }
+}

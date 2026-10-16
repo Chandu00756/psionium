@@ -1,0 +1,28 @@
+body {
+  margin: 0;
+  font-family: "Courier New", monospace;
+  background-color: black;
+  color: white;
+}
+
+.terminal {
+  padding: 20px;
+  height: 100vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.input-line {
+  display: flex;
+  align-items: center;
+}
+
+input {
+  background: none;
+  border: none;
+  color: green;
+  font-family: "Courier New", monospace;
+  font-size: 16px;
+  outline: none;
+  flex-grow: 1;
+}

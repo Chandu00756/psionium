@@ -1,0 +1,44 @@
+import 'package:flutter/material.dart';
+import 'file_management_screen.dart';
+import 'command_execution_screen.dart';
+
+class HomeScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("pSIONIUM Dock"),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "Welcome to pSIONIUM Dock!",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => FileManagementScreen()),
+                );
+              },
+              child: Text("File Management"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => CommandExecutionScreen()),
+                );
+              },
+              child: Text("Command Execution"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

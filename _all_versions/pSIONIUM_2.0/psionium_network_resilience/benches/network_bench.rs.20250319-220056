@@ -1,0 +1,61 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use psionium_network_resilience::network::secure_channel::SecureChannel;
+use psionium_network_resilience::network::anomaly_detector::NetworkAnomalyDetector;
+use ed25519_dalek::{SigningKey, VerifyingKey};
+use psionium_ai_threat_detection::detector::ThreatDetector;
+use rand::RngCore;
+use rand::thread_rng;
+use tokio::runtime::Runtime;
+
+fn setup_keys() -> (SigningKey, VerifyingKey) {
+    let mut rng = thread_rng();
+    let mut secret = [0u8; 32];
+    rng.fill_bytes(&mut secret);
+    let signing_key = SigningKey::from_bytes(&secret);
+    let verifying_key = signing_key.verifying_key();
+    (signing_key, verifying_key)
+}
+
+fn bench_secure_channel(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+    let (signing_key, verifying_key) = setup_keys();
+    let data = vec![0u8; 10 * 1024 * 1024]; // 10MB for scale
+
+    c.bench_function("secure_channel_high_throughput", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let mut channel = SecureChannel::new(signing_key.clone(), verifying_key, "localhost:8080")
+                    .await
+                    .expect("Failed to init channel");
+                channel.send(&data).await.expect("Send failed");
+                channel.receive().await.expect("Receive failed");
+            })
+        })
+    });
+}
+
+fn bench_anomaly_detector(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+    let (_, verifying_key) = setup_keys();
+    let detector = ThreatDetector::new(verifying_key);
+    let packet_features = vec![15.0, 30.0, 7.0, 100.0, 50.0]; // Expanded features
+
+    let mut group = c.benchmark_group("anomaly_detector_scale");
+    for window_size in [100, 1000, 10000].iter() {
+        group.bench_with_input(
+            criterion::BenchmarkId::from_parameter(window_size),
+            window_size,
+            |b, &size| {
+                let anomaly_detector = NetworkAnomalyDetector::new(detector.clone(), size);
+                b.iter(|| {
+                    rt.block_on(anomaly_detector.analyze_packet(packet_features.clone(), black_box(1234567890)))
+                        .expect("Analyze failed");
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
+criterion_group!(benches, bench_secure_channel, bench_anomaly_detector);
+criterion_main!(benches);

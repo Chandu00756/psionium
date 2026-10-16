@@ -1,0 +1,115 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+
+class FileManagementScreen extends StatelessWidget {
+  Future<void> uploadFile(File file) async {
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('http://localhost:8000/upload'),
+    );
+    request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+    var response = await request.send();
+    if (response.statusCode == 200) {
+      print('File uploaded!');
+    } else {
+      print('Upload failed');
+    }
+  }
+
+  Future<void> downloadFile(String fileName) async {
+    var response = await http.get(Uri.parse('http://localhost:8000/download?file=$fileName'));
+
+    if (response.statusCode == 200) {
+      // Save the file to the device
+      final directory = await getDownloadsDirectory();
+      final filePath = '${directory!.path}/$fileName';
+      File file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+      print('File downloaded to: $filePath');
+    } else {
+      print('Download failed');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("File Management"),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Expanded(
+              child: DragTarget<File>(
+                onAccept: (file) {
+                  uploadFile(file);
+                },
+                builder: (context, candidateData, rejectedData) {
+                  return Center(
+                    child: Text(
+                      "Drag and drop files here to upload",
+                      style: TextStyle(fontSize: 18),
+                    ),
+                  );
+                },
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final picker = ImagePicker();
+                final pickedFile = await picker.getImage(source: ImageSource.gallery);
+                if (pickedFile != null) {
+                  uploadFile(File(pickedFile.path));
+                }
+              },
+              child: Text("Upload File"),
+            ),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                // Prompt user for file name
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    String fileName = '';
+                    return AlertDialog(
+                      title: Text("Download File"),
+                      content: TextField(
+                        decoration: InputDecoration(hintText: "Enter file name"),
+                        onChanged: (value) {
+                          fileName = value;
+                        },
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text("Cancel"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            downloadFile(fileName);
+                            Navigator.pop(context);
+                          },
+                          child: Text("Download"),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+              child: Text("Download File"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

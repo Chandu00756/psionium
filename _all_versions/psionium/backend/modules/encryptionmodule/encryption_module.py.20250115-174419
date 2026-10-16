@@ -1,0 +1,184 @@
+from oqs import KeyEncapsulation, Signature
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+import os
+
+class EncryptionModule:
+    def __init__(self):
+        # Supported algorithms
+        self.supported_algorithms = {
+            # Post-Quantum Algorithms
+            "Kyber": "Kyber512",  # Key Encapsulation
+            "Dilithium": "Dilithium2",  # Digital Signature
+            "Falcon": "Falcon-512",  # Digital Signature
+            "NTRU": "NTRU-HPS-2048-677",  # Encryption
+            "SPHINCS+": "SPHINCS+-SHA256-128f-simple",  # Stateless Hash-Based Signature
+            # Traditional Algorithms
+            "AES-256": "AES-256",  # Symmetric Encryption
+            "ChaCha20": "ChaCha20",  # Stream Cipher
+        }
+
+    def list_supported_algorithms(self):
+        """Returns a list of supported encryption algorithms."""
+        return list(self.supported_algorithms.keys())
+
+    def encrypt(self, data, algorithm, parameters=None):
+        """Encrypts data using the specified algorithm."""
+        if algorithm not in self.supported_algorithms:
+            raise ValueError(f"Unsupported algorithm: {algorithm}")
+
+        if algorithm == "Kyber":
+            return self._encrypt_kyber(data)
+        elif algorithm == "Dilithium":
+            return self._sign_dilithium(data)
+        elif algorithm == "Falcon":
+            return self._sign_falcon(data)
+        elif algorithm == "NTRU":
+            return self._encrypt_ntru(data)
+        elif algorithm == "SPHINCS+":
+            return self._sign_sphincs(data)
+        elif algorithm == "AES-256":
+            return self._encrypt_aes(data, parameters)
+        elif algorithm == "ChaCha20":
+            return self._encrypt_chacha20(data, parameters)
+        else:
+            raise ValueError(f"Algorithm not implemented: {algorithm}")
+
+    def _encrypt_kyber(self, data):
+        """Encrypts data using Kyber (Key Encapsulation Mechanism)."""
+        kem = KeyEncapsulation(self.supported_algorithms["Kyber"])
+        public_key = kem.generate_keypair()  # Generate public/private key pair
+        ciphertext, shared_secret = kem.encap_secret(public_key)  # Encapsulate shared secret
+
+        # Use the shared secret for symmetric encryption (e.g., AES)
+        iv = os.urandom(16)  # Generate a 128-bit IV
+        cipher = Cipher(algorithms.AES(shared_secret), modes.CFB(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
+
+        # Return the ciphertext, encrypted data, IV, and private key
+        return {
+            "ciphertext": ciphertext,
+            "encrypted_data": encrypted_data,
+            "iv": iv,
+            "private_key": kem.export_secret_key(),  # Export the private key
+        }
+
+    def _sign_dilithium(self, data):
+        """Signs data using Dilithium (Digital Signature)."""
+        signer = Signature(self.supported_algorithms["Dilithium"])
+        public_key = signer.generate_keypair()  # Generate public/private key pair
+        signature = signer.sign(data)  # Sign data using the private key
+
+        # Verify the signature
+        is_valid = signer.verify(data, signature, public_key)
+        if not is_valid:
+            raise ValueError("Dilithium signature verification failed")
+
+        return signature  # Return digital signature
+
+    def _sign_falcon(self, data):
+        """Signs data using Falcon (Digital Signature)."""
+        signer = Signature(self.supported_algorithms["Falcon"])
+        public_key = signer.generate_keypair()  # Generate public/private key pair
+        signature = signer.sign(data)  # Sign data using the private key
+
+        # Verify the signature
+        is_valid = signer.verify(data, signature, public_key)
+        if not is_valid:
+            raise ValueError("Falcon signature verification failed")
+
+        return signature  # Return digital signature
+
+    def _encrypt_ntru(self, data):
+        """Encrypts data using NTRU (Encryption)."""
+        kem = KeyEncapsulation(self.supported_algorithms["NTRU"])
+        public_key = kem.generate_keypair()  # Generate public/private key pair
+        ciphertext, shared_secret = kem.encap_secret(public_key)  # Encrypt using public key
+        return ciphertext  # Return encrypted data
+
+    def _sign_sphincs(self, data):
+        """Signs data using SPHINCS+ (Stateless Hash-Based Signature)."""
+        signer = Signature(self.supported_algorithms["SPHINCS+"])
+        public_key = signer.generate_keypair()  # Generate public/private key pair
+        signature = signer.sign(data)  # Sign data using the private key
+
+        # Verify the signature
+        is_valid = signer.verify(data, signature, public_key)
+        if not is_valid:
+            raise ValueError("SPHINCS+ signature verification failed")
+
+        return signature  # Return digital signature
+
+    def _encrypt_aes(self, data, key):
+        """Encrypts data using AES-256 (Symmetric Encryption)."""
+        if not key:
+            key = os.urandom(32)  # Generate a 256-bit key
+        iv = os.urandom(16)  # Generate a 128-bit IV
+        cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
+        return iv + encrypted_data  # Return IV + encrypted data
+
+    def _encrypt_chacha20(self, data, key):
+        """Encrypts data using ChaCha20 (Stream Cipher)."""
+        if not key:
+            key = os.urandom(32)  # Generate a 256-bit key
+        nonce = os.urandom(16)  # Generate a 128-bit (16-byte) nonce
+        cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
+        return nonce + encrypted_data  # Return nonce + encrypted data
+
+    def decrypt(self, encrypted_data, algorithm, parameters=None):
+        """Decrypts data using the specified algorithm."""
+        if algorithm not in self.supported_algorithms:
+            raise ValueError(f"Unsupported algorithm: {algorithm}")
+
+        if algorithm == "Kyber":
+            return self._decrypt_kyber(encrypted_data)
+        elif algorithm == "AES-256":
+            return self._decrypt_aes(encrypted_data, parameters)
+        elif algorithm == "ChaCha20":
+            return self._decrypt_chacha20(encrypted_data, parameters)
+        else:
+            raise ValueError(f"Algorithm not implemented for decryption: {algorithm}")
+
+    def _decrypt_kyber(self, encrypted_package):
+        """Decrypts data using Kyber (Key Encapsulation Mechanism)."""
+        kem = KeyEncapsulation(self.supported_algorithms["Kyber"])
+        # Reinitialize the KEM with the private key
+        kem.generate_keypair()  # Generate a new key pair
+        kem._secret_key = encrypted_package["private_key"]  # Manually set the private key
+
+        # Decapsulate the shared secret
+        shared_secret = kem.decap_secret(encrypted_package["ciphertext"])
+
+        # Use the shared secret for symmetric decryption (e.g., AES)
+        cipher = Cipher(algorithms.AES(shared_secret), modes.CFB(encrypted_package["iv"]), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(encrypted_package["encrypted_data"]) + decryptor.finalize()
+
+        return decrypted_data
+
+    def _decrypt_aes(self, encrypted_data, key):
+        """Decrypts data using AES-256 (Symmetric Encryption)."""
+        if not key:
+            raise ValueError("AES-256 decryption requires a key.")
+        iv = encrypted_data[:16]  # Extract IV from the first 16 bytes
+        ciphertext = encrypted_data[16:]  # Extract ciphertext
+        cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+        return decrypted_data  # Return decrypted data
+
+    def _decrypt_chacha20(self, encrypted_data, key):
+        """Decrypts data using ChaCha20 (Stream Cipher)."""
+        if not key:
+            raise ValueError("ChaCha20 decryption requires a key.")
+        nonce = encrypted_data[:16]  # Extract nonce from the first 16 bytes
+        ciphertext = encrypted_data[16:]  # Extract ciphertext
+        cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+        return decrypted_data  # Return decrypted data

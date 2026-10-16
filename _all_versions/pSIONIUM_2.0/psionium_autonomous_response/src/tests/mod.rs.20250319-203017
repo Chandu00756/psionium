@@ -1,0 +1,46 @@
+use crate::ipc::IpcChannel; // Import IpcChannel from the ipc module at the crate root
+use std::sync::Arc;
+use ed25519_dalek::{Keypair, SigningKey, VerifyingKey, Signature, Signer}; // For cryptographic operations
+use tokio::net::UnixStream; // For IPC over Unix sockets, if applicable
+use tokio::io::{AsyncReadExt, AsyncWriteExt}; // For async I/O
+use log::info; // For logging test results
+use rand::thread_rng; // For generating random keys
+use rand::RngCore; // For filling byte arrays with random data
+
+// Define the test module
+#[cfg(test)]
+mod tests {
+    use super::*; // Bring all outer items into scope within the test module
+
+    #[tokio::test] // Use tokio's test macro for async tests
+    async fn test_ipc_send_receive() {
+        // Initialize logger (optional, remove if not needed)
+        env_logger::init();
+
+        // Set up cryptographic keys for signing and verification
+        let mut rng = thread_rng();
+        let mut secret = [0u8; 32];
+        rng.fill_bytes(&mut secret);
+        let signing_key = SigningKey::from_bytes(&secret);
+        let verifying_key = signing_key.verifying_key();
+
+        // Create an IpcChannel instance with the verifying key
+        let ipc = Arc::new(IpcChannel::new(verifying_key));
+
+        // Test data to send
+        let data = b"test data";
+        let signature = signing_key.sign(data); // Sign the data
+
+        // Send the data and signature via the IpcChannel
+        let send_result = ipc.send_response(data, &signature.to_bytes()).await;
+        assert!(send_result.is_ok(), "Failed to send data via IPC");
+
+        // Receive the data back and verify
+        let received_data = ipc.receive_response().await;
+        assert!(received_data.is_ok(), "Failed to receive data via IPC");
+        assert_eq!(received_data.unwrap(), data, "Received data does not match sent data");
+
+        // Log success (optional)
+        info!("IPC send/receive test passed");
+    }
+}

@@ -1,0 +1,46 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+class CommandExecutionScreen extends StatelessWidget {
+  Future<void> executeCommand(String command) async {
+    var response = await http.get(
+      Uri.parse('http://localhost:8000/execute?command=$command'),
+    );
+    if (response.statusCode == 200) {
+      var data = jsonDecode(response.body);
+      print("Result: ${data['result']}");
+    } else {
+      print("Command execution failed");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Command Execution"),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              decoration: InputDecoration(
+                hintText: "Enter command (e.g., encode file.txt)",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                // Execute command
+              },
+              child: Text("Execute"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

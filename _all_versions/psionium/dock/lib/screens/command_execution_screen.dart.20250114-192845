@@ -1,0 +1,137 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+class CommandExecutionScreen extends StatefulWidget {
+  @override
+  _CommandExecutionScreenState createState() => _CommandExecutionScreenState();
+}
+
+class _CommandExecutionScreenState extends State<CommandExecutionScreen> {
+  final TextEditingController _commandController = TextEditingController();
+  List<String> _outputHistory = [];
+  final ScrollController _scrollController = ScrollController();
+
+  Future<void> executeCommand(String command) async {
+    if (command.isEmpty) return;
+
+    setState(() {
+      _outputHistory.add("pSIONIUM> $command");
+    });
+
+    var response = await http.get(
+      Uri.parse('http://localhost:8000/execute?command=$command'),
+    );
+
+    if (response.statusCode == 200) {
+      var data = jsonDecode(response.body);
+      setState(() {
+        _outputHistory.add("${data['result']}\n");
+      });
+    } else {
+      setState(() {
+        _outputHistory.add("Command execution failed\n");
+      });
+    }
+
+    _commandController.clear();
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("pSIONIUM Terminal"),
+        backgroundColor: Colors.black,
+      ),
+      backgroundColor: Colors.black,
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                itemCount: _outputHistory.length,
+                itemBuilder: (context, index) {
+                  return Text(
+                    _outputHistory[index],
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commandController,
+                    decoration: InputDecoration(
+                      hintText: "Enter command...",
+                      hintStyle: TextStyle(color: Colors.green),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                    ),
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSubmitted: (value) {
+                      executeCommand(value);
+                    },
+                  ),
+                ),
+                SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    executeCommand(_commandController.text);
+                  },
+                  child: Text(
+                    "Execute",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    primary: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

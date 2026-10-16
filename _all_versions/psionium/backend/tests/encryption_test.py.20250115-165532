@@ -1,0 +1,26 @@
+import sys
+import os
+import base64
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'modules'))
+from encryptionmodule.encryption_module import EncryptionModule
+
+# Initialize the Encryption Module
+encryption_module = EncryptionModule()
+
+# Test Kyber
+data = b"Hello, Psionium!"
+encrypted_data = encryption_module.encrypt(data, "Kyber")
+decrypted_data = encryption_module.decrypt(encrypted_data, "Kyber")
+print("Kyber Decrypted Data (base64):", base64.b64encode(decrypted_data).decode('utf-8'))
+
+# Test AES-256
+key = os.urandom(32)  # Generate a 256-bit key
+encrypted_data = encryption_module.encrypt(data, "AES-256", key)
+decrypted_data = encryption_module.decrypt(encrypted_data, "AES-256", key)
+print("AES-256 Decrypted Data:", decrypted_data.decode())
+
+# Test ChaCha20
+key = os.urandom(32)  # Generate a 256-bit key
+encrypted_data = encryption_module.encrypt(data, "ChaCha20", key)
+decrypted_data = encryption_module.decrypt(encrypted_data, "ChaCha20", key)
+print("ChaCha20 Decrypted Data:", decrypted_data.decode())

@@ -1,0 +1,42 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use psionium_autonomous_response::response::ResponseEngine;
+use psionium_crypto_engine::crypto::PsioniumCrypto;
+use psionium_ai_threat_detection::detector::ThreatDetector;
+use ed25519_dalek::SigningKey;
+use rand::RngCore;
+
+fn threat_scenarios() -> Vec<Vec<f64>> {
+    vec![
+        vec![15.0, 30.0, 7.0],   // Critical threat
+        vec![5.0, 10.0, 2.0],    // Low risk
+        vec![25.0, 50.0, 15.0],  // APT pattern
+    ]
+}
+
+fn bench_response(c: &mut Criterion) {
+    let mut rng = rand::thread_rng();
+    let mut secret = [0u8; 32];
+    rng.fill_bytes(&mut secret);
+    let signing_key = SigningKey::from_bytes(&secret);
+    
+    let crypto = PsioniumCrypto::new().expect("Crypto init failed");
+    let detector = ThreatDetector::new(signing_key.verifying_key());
+    let engine = ResponseEngine::new(crypto, detector, signing_key);
+
+    let mut group = c.benchmark_group("response_throughput");
+    for scenario in threat_scenarios() {
+        group.throughput(Throughput::Elements(scenario.len() as u64));
+        group.bench_with_input(
+            format!("handle_threat_{:?}", scenario),
+            &scenario,
+            |b, s| {
+                b.to_async(tokio::runtime::Runtime::new().unwrap())
+                    .iter(|| engine.handle_threat(black_box(1234), black_box(s)))
+            },
+        );
+    }
+    group.finish();
+}
+
+criterion_group!(benches, bench_response);
+criterion_main!(benches);

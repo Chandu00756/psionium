@@ -1,0 +1,122 @@
+import numpy as np
+import hashlib
+import logging
+import heapq
+from collections import defaultdict
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+__version__ = "0.2.1"
+
+class EntropyDrivenLosslessCompressor:
+    def __init__(self):
+        self.symbols = None
+        self.probabilities = None
+
+    def compress(self, data):
+        self.symbols, counts = np.unique(data, return_counts=True)
+        self.probabilities = counts / len(data)
+        encoded = ''.join(self._encode_symbol(symbol) for symbol in data)
+        # Convert the encoded string to a byte array
+        return np.frombuffer(encoded.encode(), dtype=np.uint8)
+
+    def decompress(self, compressed_data):
+        # Convert the byte array back to a binary string
+        binary_str = ''.join(format(byte, '08b') for byte in compressed_data)
+        decoded = []
+        current_code = ''
+        for bit in binary_str:
+            current_code += bit
+            for symbol, code in zip(self.symbols, self._generate_codes()):
+                if current_code == code:
+                    decoded.append(symbol)
+                    current_code = ''
+                    break
+        return np.array(decoded, dtype=np.uint8)
+
+    def _encode_symbol(self, symbol):
+        index = np.where(self.symbols == symbol)[0][0]
+        return self._generate_codes()[index]
+
+    def _generate_codes(self):
+        codes = ['0', '1']
+        while len(codes) < len(self.symbols):
+            codes = [code + '0' for code in codes] + [code + '1' for code in codes]
+        return codes[:len(self.symbols)]
+
+class HuffmanCompressor:
+    def compress(self, data):
+        freq = defaultdict(int)
+        for symbol in data:
+            freq[symbol] += 1
+        
+        heap = [[weight, [symbol, ""]] for symbol, weight in freq.items()]
+        heapq.heapify(heap)
+        
+        while len(heap) > 1:
+            lo = heapq.heappop(heap)
+            hi = heapq.heappop(heap)
+            for pair in lo[1:]:
+                pair[1] = '0' + pair[1]
+            for pair in hi[1:]:
+                pair[1] = '1' + pair[1]
+            heapq.heappush(heap, [lo[0] + hi[0]] + lo[1:] + hi[1:])
+        
+        huff_dict = dict(heap[0][1:])
+        encoded = ''.join([huff_dict[symbol] for symbol in data])
+        padding = 8 - len(encoded) % 8
+        encoded += '0' * padding
+        
+        return (padding, huff_dict, bytes(int(encoded[i:i+8], 2) for i in range(0, len(encoded), 8)))
+
+    def decompress(self, compressed_data):
+        padding, huff_dict, byte_data = compressed_data
+        encoded = ''.join([format(byte, '08b') for byte in byte_data])
+        encoded = encoded[:-padding] if padding else encoded
+        
+        inv_dict = {code: symbol for symbol, code in huff_dict.items()}
+        decoded = []
+        code = ""
+        for bit in encoded:
+            code += bit
+            if code in inv_dict:
+                decoded.append(inv_dict[code])
+                code = ""
+        
+        return np.array(decoded, dtype=np.uint8)
+
+class QIACModule:
+    def __init__(self):
+        self.entropy_coder = EntropyDrivenLosslessCompressor()
+        self.huffman_compressor = HuffmanCompressor()
+
+    def compress(self, data):
+        try:
+            checksum = hashlib.md5(data.tobytes()).hexdigest()
+            compressed_data = self._compress_internal(data)
+            logger.info(f"Compression successful. Original size: {len(data)}, Compressed size: {len(compressed_data)}")
+            return checksum, compressed_data
+        except Exception as e:
+            logger.error(f"Compression failed: {str(e)}")
+            raise
+
+    def decompress(self, checksum, compressed_data):
+        try:
+            decompressed_data = self._decompress_internal(compressed_data)
+            if hashlib.md5(decompressed_data.tobytes()).hexdigest() != checksum:
+                raise ValueError("Data integrity check failed")
+            logger.info(f"Decompression successful. Compressed size: {len(compressed_data)}, Decompressed size: {len(decompressed_data)}")
+            return decompressed_data
+        except Exception as e:
+            logger.error(f"Decompression failed: {str(e)}")
+            raise
+
+    def _compress_internal(self, data):
+        entropy_compressed = self.entropy_coder.compress(data)
+        huffman_compressed = self.huffman_compressor.compress(entropy_compressed)
+        return huffman_compressed
+
+    def _decompress_internal(self, compressed_data):
+        entropy_decoded = self.huffman_compressor.decompress(compressed_data)
+        return self.entropy_coder.decompress(entropy_decoded)

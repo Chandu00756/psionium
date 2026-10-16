@@ -1,0 +1,270 @@
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+
+class DataEncodingScreen extends StatefulWidget {
+  @override
+  _DataEncodingScreenState createState() => _DataEncodingScreenState();
+}
+
+class _DataEncodingScreenState extends State<DataEncodingScreen> {
+  List<String> _selectedFiles = [];
+  String _selectedEncoding = "Base64";
+  bool _isProcessing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text(
+          "Data Encoding/Decoding",
+          style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.black,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // File Selection Section
+              _buildFileSelectionSection(),
+              SizedBox(height: 20),
+
+              // Encoding Options Section
+              _buildEncodingOptionsSection(),
+              SizedBox(height: 20),
+
+              // Action Buttons Section
+              _buildActionButtonsSection(),
+              SizedBox(height: 20),
+
+              // Processing Status Section
+              _buildProcessingStatusSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileSelectionSection() {
+    return Card(
+      color: Colors.grey[900],
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Select Files",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _selectedFiles.map((file) {
+                return Chip(
+                  label: Text(file, style: TextStyle(color: Colors.white)),
+                  deleteIcon: Icon(Icons.close, color: Colors.white),
+                  onDeleted: () {
+                    setState(() {
+                      _selectedFiles.remove(file);
+                    });
+                  },
+                  backgroundColor: Colors.grey[800],
+                );
+              }).toList(),
+            ),
+            SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: _selectFiles,
+              icon: Icon(Icons.add, color: Colors.black),
+              label: Text("Add Files", style: TextStyle(color: Colors.black)),
+              style: ElevatedButton.styleFrom(
+                primary: Colors.green,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEncodingOptionsSection() {
+    return Card(
+      color: Colors.grey[900],
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Encoding Options",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: _selectedEncoding,
+              items: ["Base64", "Hex", "DDED"].map((encoding) {
+                return DropdownMenuItem(
+                  value: encoding,
+                  child: Text(encoding, style: TextStyle(color: Colors.white)),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedEncoding = value!;
+                });
+              },
+              decoration: InputDecoration(
+                labelText: "Encoding Format",
+                labelStyle: TextStyle(color: Colors.green),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.green),
+                ),
+              ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              "Custom Encoding Parameters",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            SizedBox(height: 10),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Entropy Source",
+                labelStyle: TextStyle(color: Colors.green),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.green),
+                ),
+              ),
+            ),
+            SizedBox(height: 10),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Dimensions",
+                labelStyle: TextStyle(color: Colors.green),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.green),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtonsSection() {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: _isProcessing ? null : _encodeFiles,
+            icon: Icon(Icons.lock, color: Colors.black),
+            label: Text("Encode", style: TextStyle(color: Colors.black)),
+            style: ElevatedButton.styleFrom(
+              primary: Colors.green,
+              padding: EdgeInsets.symmetric(vertical: 15),
+            ),
+          ),
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: _isProcessing ? null : _decodeFiles,
+            icon: Icon(Icons.lock_open, color: Colors.black),
+            label: Text("Decode", style: TextStyle(color: Colors.black)),
+            style: ElevatedButton.styleFrom(
+              primary: Colors.blue,
+              padding: EdgeInsets.symmetric(vertical: 15),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProcessingStatusSection() {
+    return Card(
+      color: Colors.grey[900],
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Processing Status",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            _isProcessing
+                ? CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                  )
+                : Text(
+                    "No files are currently being processed.",
+                    style: TextStyle(color: Colors.white),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectFiles() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(allowMultiple: true);
+    if (result != null) {
+      setState(() {
+        _selectedFiles = result.paths.map((path) => path!).toList();
+      });
+    }
+  }
+
+  Future<void> _encodeFiles() async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    // Simulate encoding process
+    await Future.delayed(Duration(seconds: 2));
+
+    setState(() {
+      _isProcessing = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Files encoded successfully!", style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _decodeFiles() async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    // Simulate decoding process
+    await Future.delayed(Duration(seconds: 2));
+
+    setState(() {
+      _isProcessing = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Files decoded successfully!", style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+}

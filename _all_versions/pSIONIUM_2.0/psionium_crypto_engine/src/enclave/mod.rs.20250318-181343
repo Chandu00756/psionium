@@ -1,0 +1,50 @@
+use memsec::{ProtectedMemory, memzero};
+use crate::utils::PsioniumError;
+use crate::logging::log_operation;
+use log::info;
+
+pub struct PsioniumEnclave {
+    key_vault: ProtectedMemory,  // Secure, tamper-resistant memory
+    len: usize,                  // Length of stored keys
+}
+
+impl PsioniumEnclave {
+    pub fn new() -> Result<Self, PsioniumError> {
+        info!("Initializing PsioniumEnclave with protected memory");
+        // Allocate 4096 bytes initially (enough for serialized keys)
+        let vault = ProtectedMemory::new(4096)
+            .map_err(|e| PsioniumError::EnclaveInit(format!("Protected memory init failed: {:?}", e)))?;
+        Ok(PsioniumEnclave {
+            key_vault: vault,
+            len: 0,
+        })
+    }
+
+    pub fn store_key(&mut self, key_blob: Vec<u8>) -> Result<(), PsioniumError> {
+        if key_blob.len() > self.key_vault.len() {
+            return Err(PsioniumError::EnclaveInit("Key blob too large for vault".into()));
+        }
+        unsafe {
+            let ptr = self.key_vault.as_mut_ptr();
+            std::ptr::copy_nonoverlapping(key_blob.as_ptr(), ptr, key_blob.len());
+        }
+        self.len = key_blob.len();
+        log_operation("store_key", "success", self.len);
+        Ok(())
+    }
+
+    pub fn retrieve_key(&self) -> Result<&[u8], PsioniumError> {
+        unsafe {
+            Ok(std::slice::from_raw_parts(self.key_vault.as_ptr(), self.len))
+        }
+    }
+}
+
+impl Drop for PsioniumEnclave {
+    fn drop(&mut self) {
+        unsafe {
+            memzero(self.key_vault.as_mut_ptr(), self.len);
+        }
+        info!("Enclave keys securely wiped from protected memory");
+    }
+}

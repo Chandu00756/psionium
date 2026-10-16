@@ -1,0 +1,23 @@
+from encoding_system import EncodingSystem
+
+# Test Base64 encoding/decoding with the system
+def test_base64_system():
+    system = EncodingSystem(encoding_type="base64")
+    data = "Hello, pSIONIUM!"
+    encoded_data = system.process(data)
+    decoded_data = system.reverse_process(encoded_data)
+    assert decoded_data.decode('utf-8') == data, "Base64 system test failed!"
+
+# Test Hexadecimal encoding/decoding with the system
+def test_hex_system():
+    system = EncodingSystem(encoding_type="hex")
+    data = "Hello, pSIONIUM!"
+    encoded_data = system.process(data)
+    decoded_data = system.reverse_process(encoded_data)
+    assert decoded_data.decode('utf-8') == data, "Hex system test failed!"
+
+# Run tests
+if __name__ == "__main__":
+    test_base64_system()
+    test_hex_system()
+    print("All system tests passed!")

@@ -1,0 +1,259 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
+
+class CommandExecutionScreen extends StatefulWidget {
+  @override
+  _CommandExecutionScreenState createState() => _CommandExecutionScreenState();
+}
+
+class _CommandExecutionScreenState extends State<CommandExecutionScreen> {
+  final TextEditingController _commandController = TextEditingController();
+  List<String> _outputHistory = [];
+  final ScrollController _scrollController = ScrollController();
+
+  Future<void> executeCommand(String command) async {
+    if (command.isEmpty) return;
+
+    setState(() {
+      _outputHistory.add("pSIONIUM> $command");
+    });
+
+    try {
+      var response = await http.get(
+        Uri.parse('http://192.168.12.204:8000/execute?command=$command'),
+      );
+
+      if (response.statusCode == 200) {
+        var data = jsonDecode(response.body);
+        setState(() {
+          _outputHistory.add("${data['result']}\n");
+        });
+      } else {
+        setState(() {
+          _outputHistory.add("Command execution failed: ${response.statusCode}\n");
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _outputHistory.add("Connection failed: $e\n");
+      });
+    }
+
+    _commandController.clear();
+    _scrollToBottom();
+  }
+
+  Future<void> uploadFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+    if (result != null) {
+      File file = File(result.files.single.path!);
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://192.168.12.204:8000/upload'),
+      );
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          file.path,
+          contentType: MediaType('application', 'octet-stream'),
+        ),
+      );
+
+      try {
+        var response = await request.send();
+
+        if (response.statusCode == 200) {
+          setState(() {
+            _outputHistory.add("File uploaded successfully\n");
+          });
+        } else {
+          setState(() {
+            _outputHistory.add("File upload failed\n");
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _outputHistory.add("Connection failed: $e\n");
+        });
+      }
+    } else {
+      setState(() {
+        _outputHistory.add("No file selected\n");
+      });
+    }
+
+    _scrollToBottom();
+  }
+
+  Future<void> downloadFile(String filename) async {
+    try {
+      var response = await http.get(
+        Uri.parse('http://192.168.12.204:8000/download?file=$filename'),
+      );
+
+      if (response.statusCode == 200) {
+        final directory = Directory.systemTemp;
+        final file = File('${directory.path}/$filename');
+        await file.writeAsBytes(response.bodyBytes);
+
+        setState(() {
+          _outputHistory.add("File downloaded to: ${file.path}\n");
+        });
+      } else {
+        setState(() {
+          _outputHistory.add("File download failed\n");
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _outputHistory.add("Connection failed: $e\n");
+      });
+    }
+
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("pSIONIUM Terminal"),
+        backgroundColor: Colors.black,
+      ),
+      backgroundColor: Colors.black,
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                itemCount: _outputHistory.length,
+                itemBuilder: (context, index) {
+                  return Text(
+                    _outputHistory[index],
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commandController,
+                    decoration: InputDecoration(
+                      hintText: "Enter command...",
+                      hintStyle: TextStyle(color: Colors.green),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                    ),
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSubmitted: (value) {
+                      executeCommand(value);
+                    },
+                  ),
+                ),
+                SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    executeCommand(_commandController.text);
+                  },
+                  child: Text(
+                    "Execute",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: uploadFile,
+                    child: Text(
+                      "Upload File",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontFamily: 'Courier New',
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      downloadFile("test.txt");
+                    },
+                    child: Text(
+                      "Download File",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontFamily: 'Courier New',
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

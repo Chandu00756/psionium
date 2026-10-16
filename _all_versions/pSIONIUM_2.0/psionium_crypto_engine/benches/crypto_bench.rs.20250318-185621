@@ -1,0 +1,16 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use psionium_crypto_engine::crypto::PsioniumCrypto;
+
+fn bench_encryption(c: &mut Criterion) {
+    let crypto = PsioniumCrypto::new().unwrap();
+    let plaintext = b"Classified Data";
+
+    c.bench_function("encrypt", |b| {
+        b.iter(|| {
+            crypto.encrypt(black_box(plaintext)).unwrap();
+        })
+    });
+}
+
+criterion_group!(benches, bench_encryption);
+criterion_main!(benches);

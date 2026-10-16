@@ -1,0 +1,54 @@
+# compression_system/compression_system.py
+import os
+from typing import Optional
+from compression_module.compression_module import CompressionModule
+
+class CompressionSystem:
+    def __init__(self):
+        self.compression_module = CompressionModule()
+
+    def compress_data(self, encoded_data: bytes, save_path: Optional[str] = None) -> bytes:
+        """
+        Compress encoded data and optionally save it to a file.
+        :param encoded_data: Encoded data from the encoding system.
+        :param save_path: Path to save the compressed file (optional).
+        :return: Compressed data.
+        """
+        try:
+            # Step 1: Compress the data
+            compressed_data = self.compression_module.compress(encoded_data, use_ai=True, use_quantum=False)
+
+            # Step 2: Save the compressed data if a path is provided
+            if save_path:
+                self._save_compressed_file(compressed_data, save_path)
+
+            return compressed_data
+        except Exception as e:
+            raise Exception(f"Compression system error: {str(e)}")
+
+    def _save_compressed_file(self, compressed_data: bytes, save_path: str):
+        """
+        Save compressed data to a file.
+        :param compressed_data: Compressed data.
+        :param save_path: Path to save the file.
+        """
+        try:
+            with open(save_path, "wb") as file:
+                file.write(compressed_data)
+        except Exception as e:
+            raise Exception(f"Failed to save compressed file: {str(e)}")
+
+    def decompress_data(self, compressed_data: bytes) -> bytes:
+        """
+        Decompress data.
+        :param compressed_data: Compressed data.
+        :return: Decompressed data.
+        """
+        try:
+            return self.compression_module.decompress(compressed_data, use_ai=True, use_quantum=False)
+        except Exception as e:
+            raise Exception(f"Decompression system error: {str(e)}")
+
+
+# compression_system/requirements.txt
+zstandard

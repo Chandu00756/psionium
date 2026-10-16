@@ -1,0 +1,103 @@
+use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+use tokio::net::TcpStream;
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
+use tokio_tungstenite::tungstenite::Message;
+use std::sync::Arc;
+use log::info;
+use anyhow::{Result, anyhow};
+use futures::{SinkExt, StreamExt};
+use pqcrypto_kyber::kyber1024::{keypair as kyber_keypair, encapsulate, decapsulate};
+use pqcrypto_traits::kem::{PublicKey, SecretKey, Ciphertext, SharedSecret};
+use dashmap::DashMap;
+use aes_gcm::{Aes256Gcm, KeyInit, aead::Aead};
+use generic_array::GenericArray;
+use rand::Rng;
+
+pub struct SecureChannel {
+    signing_key: SigningKey,
+    verifying_key: VerifyingKey,
+    ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    kyber_secret: [u8; 32],
+    routing_table: Arc<DashMap<String, Vec<String>>>,
+}
+
+impl SecureChannel {
+    pub async fn new(signing_key: SigningKey, verifying_key: VerifyingKey, addr: &str) -> Result<Self> {
+        let (ws_stream, _) = connect_async(format!("wss://{}", addr)).await?;
+        let (kyber_pub, kyber_sec) = kyber_keypair();
+        let (ciphertext, shared_secret_enc) = encapsulate(&kyber_pub);
+        let shared_secret_dec = decapsulate(&ciphertext.as_bytes(), &kyber_sec);
+        assert_eq!(shared_secret_enc.as_bytes(), shared_secret_dec.as_bytes());
+        let kyber_secret: [u8; 32] = shared_secret_dec.as_bytes()[..32]
+            .try_into()
+            .map_err(|_| anyhow!("Kyber shared secret too short"))?;
+        let routing_table = Arc::new(DashMap::new());
+        routing_table.insert(
+            addr.to_string(),
+            vec!["10.0.0.1".to_string(), "10.0.0.2".to_string()],
+        );
+        info!("Initialized secure channel with Kyber encryption to {}", addr);
+        Ok(SecureChannel {
+            signing_key,
+            verifying_key,
+            ws_stream,
+            kyber_secret,
+            routing_table,
+        })
+    }
+
+    pub async fn send(&mut self, data: &[u8]) -> Result<()> {
+        let mut nonce_bytes = [0u8; 12];
+        rand::thread_rng().fill(&mut nonce_bytes);
+        let nonce = GenericArray::clone_from_slice(&nonce_bytes);
+        let cipher = Aes256Gcm::new_from_slice(&self.kyber_secret)
+            .map_err(|_| anyhow!("Invalid AES key length"))?;
+        let encrypted = cipher
+            .encrypt(&nonce, data)
+            .map_err(|_| anyhow!("Encryption failed"))?;
+        let signature = self.signing_key.sign(&encrypted);
+        let message = [
+            nonce_bytes.as_slice(),
+            encrypted.as_slice(),
+            signature.to_bytes().as_ref(),
+        ]
+        .concat();
+        let routes = self.routing_table.get("localhost:8080").ok_or_else(|| anyhow!("No routes found"))?;
+        let route_idx = (blake3::hash(data).as_bytes()[0] % routes.len() as u8) as usize;
+        info!("Sending via route: {}", routes[route_idx]);
+        self.ws_stream.send(Message::Binary(message)).await?;
+        Ok(())
+    }
+
+    pub async fn receive(&mut self) -> Result<Vec<u8>> {
+        while let Some(msg) = self.ws_stream.next().await {
+            match msg {
+                Ok(Message::Binary(data)) => {
+                    if data.len() < 12 + 16 + 64 {
+                        return Err(anyhow!("Received data too short"));
+                    }
+                    let (nonce_bytes, rest) = data.split_at(12);
+                    let (encrypted, sig_bytes) = rest.split_at(rest.len() - 64);
+                    let signature_bytes: [u8; 64] = sig_bytes
+                        .try_into()
+                        .map_err(|_| anyhow!("Invalid signature length"))?;
+                    let signature = Signature::from_bytes(&signature_bytes);
+                    self.verifying_key
+                        .verify(encrypted, &signature)
+                        .map_err(|_| anyhow!("Signature verification failed"))?;
+                    let nonce = GenericArray::clone_from_slice(nonce_bytes);
+                    let cipher = Aes256Gcm::new_from_slice(&self.kyber_secret)
+                        .map_err(|_| anyhow!("Invalid AES key length"))?;
+                    let payload = cipher
+                        .decrypt(&nonce, encrypted)
+                        .map_err(|_| anyhow!("Decryption failed"))?;
+                    info!("Received and decrypted data via secure channel");
+                    return Ok(payload);
+                }
+                Ok(_) => continue,
+                Err(e) => return Err(anyhow!("WebSocket error: {}", e)),
+            }
+        }
+        Err(anyhow!("WebSocket stream closed unexpectedly"))
+    }
+}

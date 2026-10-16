@@ -1,0 +1,39 @@
+import base64
+import binascii
+
+class EncodingModule:
+    def __init__(self, encoding_type="base64"):
+        """
+        Initialize the encoding module.
+        :param encoding_type: Type of encoding (default: base64).
+        """
+        self.encoding_type = encoding_type
+
+    def encode(self, data):
+        """
+        Encode the input data.
+        :param data: Raw data (bytes or string).
+        :return: Encoded data (string).
+        """
+        if isinstance(data, str):
+            data = data.encode('utf-8')  # Convert string to bytes
+
+        if self.encoding_type == "base64":
+            return base64.b64encode(data).decode('utf-8')  # Base64 encode
+        elif self.encoding_type == "hex":
+            return binascii.hexlify(data).decode('utf-8')  # Hexadecimal encode
+        else:
+            raise ValueError(f"Unsupported encoding type: {self.encoding_type}")
+
+    def decode(self, encoded_data):
+        """
+        Decode the encoded data.
+        :param encoded_data: Encoded data (string).
+        :return: Decoded data (bytes).
+        """
+        if self.encoding_type == "base64":
+            return base64.b64decode(encoded_data.encode('utf-8'))  # Base64 decode
+        elif self.encoding_type == "hex":
+            return binascii.unhexlify(encoded_data.encode('utf-8'))  # Hexadecimal decode
+        else:
+            raise ValueError(f"Unsupported encoding type: {self.encoding_type}")

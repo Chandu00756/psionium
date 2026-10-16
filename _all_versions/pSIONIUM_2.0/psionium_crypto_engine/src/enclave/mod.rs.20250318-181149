@@ -1,0 +1,40 @@
+use memsec::mprotect::ProtectedBox;
+use crate::utils::PsioniumError;
+use crate::logging::log_operation;
+use log::info;
+
+pub struct PsioniumEnclave {
+    key_vault: ProtectedBox<Vec<u8>>,  // Secure, tamper-resistant memory
+}
+
+impl PsioniumEnclave {
+    pub fn new() -> Result<Self, PsioniumError> {
+        info!("Initializing PsioniumEnclave with protected memory");
+        let vault = ProtectedBox::new(Vec::new())
+            .map_err(|e| PsioniumError::EnclaveInit(format!("Protected memory init failed: {:?}", e)))?;
+        Ok(PsioniumEnclave {
+            key_vault: vault,
+        })
+    }
+
+    pub fn store_key(&mut self, key_blob: Vec<u8>) -> Result<(), PsioniumError> {
+        *self.key_vault = key_blob;
+        log_operation("store_key", "success", self.key_vault.len());
+        Ok(())
+    }
+
+    pub fn retrieve_key(&self) -> Result<&Vec<u8>, PsioniumError> {
+        Ok(&self.key_vault)
+    }
+}
+
+impl Drop for PsioniumEnclave {
+    fn drop(&mut self) {
+        unsafe {
+            let ptr = self.key_vault.as_mut_ptr();
+            let len = self.key_vault.len();
+            memsec::memzero(ptr, len);
+        }
+        info!("Enclave keys securely wiped from protected memory");
+    }
+}

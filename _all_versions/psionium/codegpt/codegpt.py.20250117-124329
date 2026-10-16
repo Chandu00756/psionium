@@ -1,0 +1,30 @@
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
+
+# Load the model and tokenizer
+model = AutoModelForCausalLM.from_pretrained("codeparrot/codeparrot-small")
+tokenizer = AutoTokenizer.from_pretrained("codeparrot/codeparrot-small")
+
+# Prepare your dataset (e.g., a list of Python code snippets)
+train_dataset = ["def add(a, b):\n    return a + b", "def subtract(a, b):\n    return a - b"]
+
+# Tokenize the dataset
+train_encodings = tokenizer(train_dataset, truncation=True, padding=True, return_tensors="pt")
+
+# Define training arguments
+training_args = TrainingArguments(
+    output_dir="./results",
+    num_train_epochs=3,
+    per_device_train_batch_size=2,
+    save_steps=10_000,
+    save_total_limit=2,
+)
+
+# Initialize the Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_encodings,
+)
+
+# Fine-tune the model
+trainer.train()

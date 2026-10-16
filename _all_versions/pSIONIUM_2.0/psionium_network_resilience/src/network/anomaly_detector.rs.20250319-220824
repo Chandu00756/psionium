@@ -1,0 +1,74 @@
+use psionium_ai_threat_detection::detector::ThreatDetector;
+use log::{info, warn};
+use anyhow::Result;
+use std::collections::VecDeque;
+use tokio::sync::RwLock;
+use blake3::Hasher;
+
+pub struct NetworkAnomalyDetector {
+    detector: ThreatDetector,
+    packet_history: RwLock<VecDeque<(Vec<f64>, u64)>>,
+    window_size: usize,
+    entropy_threshold: f64,
+}
+
+impl NetworkAnomalyDetector {
+    pub fn new(detector: ThreatDetector, window_size: usize) -> Self {
+        info!("Initialized DOD-grade anomaly detector with predictive mesh analysis");
+        NetworkAnomalyDetector {
+            detector,
+            packet_history: RwLock::new(VecDeque::with_capacity(window_size)),
+            window_size,
+            entropy_threshold: 4.5,
+        }
+    }
+
+    pub async fn analyze_packet(&self, packet_features: Vec<f64>, timestamp: u64) -> Result<bool> {
+        let mut history = self.packet_history.write().await;
+        if history.len() >= self.window_size {
+            history.pop_front();
+        }
+        history.push_back((packet_features.clone(), timestamp));
+
+        let aggregated = Self::aggregate_features(&history);
+        let entropy = Self::calculate_entropy(&history);
+        let latency_spike = Self::detect_latency_spike(&history);
+        let mut features = aggregated;
+        features.push(entropy);
+        features.push(latency_spike);
+
+        let is_threat = self.detector.detect(&features)?;  // Assuming Result<bool, ThreatError>
+        if is_threat {
+            warn!("Threat detected: entropy={:.3}, latency_spike={:.3}", entropy, latency_spike);
+        }
+        Ok(is_threat)
+    }
+
+    fn aggregate_features(history: &VecDeque<(Vec<f64>, u64)>) -> Vec<f64> {
+        let mut aggregated = vec![0.0; history.front().unwrap().0.len()];
+        for (features, _) in history.iter() {
+            for (i, &f) in features.iter().enumerate() {
+                aggregated[i] += f;
+            }
+        }
+        aggregated.iter_mut().for_each(|x| *x /= history.len() as f64);
+        aggregated
+    }
+
+    fn calculate_entropy(history: &VecDeque<(Vec<f64>, u64)>) -> f64 {
+        let mut hasher = Hasher::new();
+        for (features, _) in history.iter() {
+            for &f in features {
+                hasher.update(&f.to_le_bytes());
+            }
+        }
+        let hash = hasher.finalize();
+        let entropy = hash.as_bytes().iter().fold(0.0, |acc, &b| {
+            let p = b as f64 / 255.0;
+            acc - if p > 0.0 { p * p.log2() } else { 0.0 }
+        });
+        entropy
+    }
+
+    fn detect_latency_spike(history: &VecDeque<(Vec<f64>, u64)>) -> f64 {
+        if history.len() < 2 { return

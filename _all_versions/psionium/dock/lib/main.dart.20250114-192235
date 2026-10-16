@@ -1,0 +1,260 @@
+import 'package:flutter/material.dart';
+import 'package:page_transition/page_transition.dart';
+import 'dart:ui'; // For ImageFilter
+
+// Import screens
+import 'screens/home_screen.dart';
+import 'screens/file_management_screen.dart';
+import 'screens/encrypt_decrypt.dart';
+import 'screens/encode_decode.dart'; // Ensure this file exists and exports EncodeDecodeScreen
+import 'screens/key_management_screen.dart';
+import 'screens/threat_management_screen.dart';
+import 'screens/workflow_automation_screen.dart';
+import 'screens/billing_screen.dart';
+import 'screens/security_settings_screen.dart';
+import 'screens/advanced_screen.dart'; // Ensure this file exists and exports AdvancedScreen
+import 'screens/command_execution_screen.dart'; // Ensure this file exists and exports CommandExecutionScreen
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'pSIONIUM Dock',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFF00FFA3), // Modern teal accent
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: MainNavigationScreen(),
+    );
+  }
+}
+
+class MainNavigationScreen extends StatefulWidget {
+  @override
+  _MainNavigationScreenState createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen>
+    with SingleTickerProviderStateMixin {
+  int _selectedIndex = 0;
+  bool _isSidebarHovered = false;
+  int _hoveredIndex = -1; // Track which item is hovered
+  late AnimationController _animationController;
+  late Animation<double> _logoAnimation;
+
+  // List of screens
+  final List<Widget> _screens = [
+    HomeScreen(),
+    FileManagementScreen(),
+    EncryptionScreen(),
+    _DataEncodingScreenState(), // Ensure this class exists in encode_decode.dart
+    KeyManagementScreen(),
+    ThreatManagementScreen(),
+    WorkflowAutomationScreen(),
+    BillingScreen(),
+    SecuritySettingsScreen(),
+    AdvancedFeaturesScreen(), // Ensure this class exists in advanced_screen.dart
+    CommandExecutionScreen(), // Ensure this class exists in command_execution_screen.dart
+  ];
+
+  // Unique icons for the navigation bar
+  final List<IconData> _navIcons = [
+    Icons.home,
+    Icons.folder,
+    Icons.lock,
+    Icons.code, // Icon for Encode/Decode
+    Icons.vpn_key,
+    Icons.security,
+    Icons.work,
+    Icons.credit_card,
+    Icons.settings,
+    Icons.build, // Icon for Advanced
+    Icons.terminal, // Icon for Command Execution
+  ];
+
+  // Labels for the navigation bar
+  final List<String> _navLabels = [
+    "Home",
+    "Files",
+    "Encrypt",
+    "Encode", // Label for Encode/Decode
+    "Keys",
+    "Threats",
+    "Workflow",
+    "Billing",
+    "Settings",
+    "Advanced", // Label for Advanced
+    "Command", // Label for Command Execution
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize the animation controller
+    _animationController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 300),
+    );
+
+    // Initialize the logo animation
+    _logoAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    // Dispose the animation controller
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Color(0xFF0A0E21), // Dark background
+      body: Row(
+        children: [
+          // Sidebar Navigation
+          MouseRegion(
+            onEnter: (_) {
+              setState(() => _isSidebarHovered = true);
+              _animationController.forward();
+            },
+            onExit: (_) {
+              setState(() => _isSidebarHovered = false);
+              _animationController.reverse();
+            },
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              width: _isSidebarHovered ? 200 : 80,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                border: Border(
+                  right: BorderSide(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Column(
+                children: [
+                  SizedBox(height: 20),
+                  // Animated Logo and Application Name
+                  Container(
+                    width: _isSidebarHovered ? 200 : 80,
+                    alignment: Alignment.center,
+                    child: AnimatedBuilder(
+                      animation: _logoAnimation,
+                      builder: (context, child) {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'p',
+                              style: TextStyle(
+                                color: Color(0xFF00FFA3),
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (_isSidebarHovered)
+                              AnimatedOpacity(
+                                opacity: _logoAnimation.value,
+                                duration: Duration(milliseconds: 300),
+                                child: Text(
+                                  'SIONIUM',
+                                  style: TextStyle(
+                                    color: Color(0xFF00FFA3),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  // Navigation Items
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: List.generate(
+                        _navIcons.length,
+                        (index) => MouseRegion(
+                          onEnter: (_) => setState(() => _hoveredIndex = index),
+                          onExit: (_) => setState(() => _hoveredIndex = -1),
+                          child: ListTile(
+                            dense: true, // Reduces padding between items
+                            leading: Icon(
+                              _navIcons[index],
+                              color: _hoveredIndex == index || _selectedIndex == index
+                                  ? Color(0xFF00FFA3)
+                                  : Colors.white.withOpacity(0.7),
+                            ),
+                            title: AnimatedOpacity(
+                              opacity: _isSidebarHovered ? 1 : 0,
+                              duration: Duration(milliseconds: 300),
+                              child: Text(
+                                _navLabels[index],
+                                style: TextStyle(
+                                  color: _hoveredIndex == index || _selectedIndex == index
+                                      ? Color(0xFF00FFA3)
+                                      : Colors.white.withOpacity(0.7),
+                                ),
+                              ),
+                            ),
+                            onTap: () => _onItemTapped(index),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Version 1.0.0
+                  AnimatedOpacity(
+                    opacity: _isSidebarHovered ? 1 : 0,
+                    duration: Duration(milliseconds: 300),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        'Version 1.0.0',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Main Content
+          Expanded(
+            child: _screens[_selectedIndex],
+          ),
+        ],
+      ),
+    );
+  }
+}

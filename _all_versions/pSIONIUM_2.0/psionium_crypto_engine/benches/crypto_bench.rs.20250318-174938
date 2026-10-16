@@ -1,0 +1,17 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use psionium_crypto::crypto::PsioniumCrypto;
+
+fn bench_encryption(c: &mut Criterion) {
+    let crypto = PsioniumCrypto::new();
+    let (public_key, secret_key) = crypto.generate_keys();
+    let plaintext = b"Classified Data";
+
+    c.bench_function("hybrid_encrypt", |b| {
+        b.iter(|| {
+            crypto.encrypt_hybrid(black_box(&public_key), black_box(plaintext));
+        })
+    });
+}
+
+criterion_group!(benches, bench_encryption);
+criterion_main!(benches);

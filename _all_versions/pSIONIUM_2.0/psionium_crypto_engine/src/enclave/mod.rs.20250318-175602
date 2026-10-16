@@ -1,0 +1,34 @@
+use memsec::{memzero, SecretBox};
+use crate::utils::PsioniumError;
+use crate::logging::log_operation;
+use log::{info, error};
+
+pub struct PsioniumEnclave {
+    key_vault: SecretBox<Vec<u8>>,  // Secure memory for keys
+}
+
+impl PsioniumEnclave {
+    pub fn new() -> Result<Self, PsioniumError> {
+        info!("Initializing PsioniumEnclave with secure memory");
+        Ok(PsioniumEnclave {
+            key_vault: SecretBox::new(Vec::new()).map_err(|e| PsioniumError::EnclaveInit(e.to_string()))?,
+        })
+    }
+
+    pub fn store_key(&mut self, key_blob: Vec<u8>) -> Result<(), PsioniumError> {
+        *self.key_vault = key_blob;
+        log_operation("store_key", "success", self.key_vault.len());
+        Ok(())
+    }
+
+    pub fn retrieve_key(&self) -> Result<&Vec<u8>, PsioniumError> {
+        Ok(&self.key_vault)
+    }
+}
+
+impl Drop for PsioniumEnclave {
+    fn drop(&mut self) {
+        memzero(&mut self.key_vault);
+        info!("Enclave keys securely wiped");
+    }
+}

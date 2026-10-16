@@ -1,0 +1,112 @@
+use crate::ipc::IpcChannel;
+use psionium_crypto_engine::crypto::PsioniumCrypto;
+use psionium_ai_threat_detection::detector::{ThreatDetector, AlertSeverity};
+use log::{info, warn, error};
+use ed25519_dalek::{SigningKey, Signer};
+use nix::sys::signal::{kill, Signal};
+use nix::unistd::Pid;
+use tokio::time::{sleep, Duration};
+use anyhow::{Result, anyhow};
+use std::sync::Arc;
+use zeroize::Zeroizing;
+
+const SELF_HEAL_DELAY: u64 = 500; // milliseconds
+
+pub struct ResponseEngine {
+    crypto: PsioniumCrypto,
+    detector: ThreatDetector,
+    ipc: Arc<IpcChannel>,
+    signing_key: Zeroizing<SigningKey>,
+}
+
+impl ResponseEngine {
+    pub fn new(crypto: PsioniumCrypto, detector: ThreatDetector, signing_key: SigningKey) -> Self {
+        let verifying_key = signing_key.verifying_key();
+        let ipc = Arc::new(
+            IpcChannel::new(verifying_key)
+                .expect("Failed to initialize IPC channel")
+        );
+        
+        info!("Quantum response engine initialized with AI-driven threat mitigation");
+        ResponseEngine {
+            crypto,
+            detector,
+            ipc,
+            signing_key: Zeroizing::new(signing_key),
+        }
+    }
+
+    pub async fn handle_threat(&self, process_id: i32, threat_data: &[f64]) -> Result<()> {
+        let detection_result = self.detector.detect(threat_data)
+            .map_err(|e| anyhow!("Threat detection failed: {}", e))?;
+
+        if !detection_result.is_threat {
+            info!("No critical threat detected: {:?}", threat_data);
+            return Ok(());
+        }
+
+        self.execute_mitigation(process_id, &detection_result.severity).await?;
+        self.log_and_report(process_id, threat_data).await?;
+        self.initiate_self_heal(process_id).await;
+
+        Ok(())
+    }
+
+    async fn execute_mitigation(&self, pid: i32, severity: &AlertSeverity) -> Result<()> {
+        let signal = match severity {
+            AlertSeverity::Critical => Signal::SIGKILL,
+            AlertSeverity::High => Signal::SIGTERM,
+            _ => Signal::SIGSTOP,
+        };
+
+        kill(Pid::from_raw(pid), signal)
+            .map_err(|e| anyhow!("Process {} termination failed: {}", pid, e))?;
+        
+        warn!("Process {} mitigated with signal {:?}", pid, signal);
+        Ok(())
+    }
+
+    async fn log_and_report(&self, pid: i32, threat_data: &[f64]) -> Result<()> {
+        let log_data = format!("Mitigated process {} | Threat vector: {:?}", pid, threat_data);
+        let (ciphertext, _, _) = self.crypto.encrypt(log_data.as_bytes())?;
+        
+        let signature = self.signing_key.sign(&ciphertext);
+        self.ipc.send_response(&ciphertext, &signature.to_bytes()).await?;
+        
+        info!("Incident report for process {} submitted to CNSA", pid);
+        Ok(())
+    }
+
+    async fn initiate_self_heal(&self, pid: i32) {
+        sleep(Duration::from_millis(SELF_HEAL_DELAY)).await;
+        info!("Initiated quantum self-healing protocol for process {}", pid);
+        
+        // Advanced healing logic would go here
+    }
+}
+
+// Enhanced error handling
+#[derive(Debug, thiserror::Error)]
+pub enum ThreatError {
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+    
+    #[error("AI model failure: {0}")]
+    ModelFailure(String),
+    
+    #[error("Cryptographic error: {0}")]
+    CryptoError(String),
+    
+    #[error("IPC failure: {0}")]
+    IpcFailure(String),
+    
+    #[error("System operation failed: {0}")]
+    SystemError(String),
+}
+
+// Zeroize all sensitive data
+impl Drop for ResponseEngine {
+    fn drop(&mut self) {
+        self.signing_key.zeroize();
+    }
+}

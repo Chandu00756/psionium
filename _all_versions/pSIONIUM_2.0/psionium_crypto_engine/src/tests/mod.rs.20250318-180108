@@ -1,0 +1,24 @@
+use super::crypto::PsioniumCrypto;
+use super::enclave::PsioniumEnclave;
+use super::logging::init_logging;
+use std::fs;
+
+#[test]
+fn test_full_encryption_cycle() {
+    init_logging();
+    let crypto = PsioniumCrypto::new().expect("Crypto init failed");
+    let mut enclave = PsioniumEnclave::new().expect("Enclave init failed");
+
+    let plaintext = b"Highly Classified Government Data";
+    fs::write("secret.txt", plaintext).expect("Failed to write test file");
+    let file_data = fs::read("secret.txt").expect("Failed to read test file");
+
+    let (ciphertext, encrypted_data, nonce) = crypto.encrypt(&file_data).expect("Encryption failed");
+    let key_blob = crypto.export_keys().expect("Key export failed");
+    enclave.store_key(key_blob).expect("Key store failed");
+
+    let decrypted_data = crypto.decrypt(&ciphertext, &encrypted_data, &nonce).expect("Decryption failed");
+
+    assert_eq!(file_data, decrypted_data);
+    println!("Full encryption cycle passed with protected enclave!");
+}

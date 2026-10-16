@@ -1,0 +1,31 @@
+[package]
+name = "psionium"
+version = "0.1.0"
+edition = "2021"
+description = "Quantum-resistant encryption engine for government-grade security"
+license = "MIT"
+
+[dependencies]
+oqs = "0.10.0"            # NIST PQC Kyber
+rand = "0.8.5"            # NIST-approved entropy
+log = "0.4.21"            # Logging framework
+env_logger = "0.11.3"     # Console logging
+serde = { version = "1.0.197", features = ["derive"] }  # Serialization
+bincode = "1.3.3"         # Binary encoding
+thiserror = "1.0.58"      # Custom errors
+ring = "0.17.8"           # Software-based crypto
+memsec = "0.6.0"          # Secure memory
+libc = "0.2.155"
+psionium_crypto = "0.1.0"  # Adjust version as needed
+
+[dev-dependencies]
+criterion = "0.5.1"       # Benchmarking
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[[bench]]
+name = "crypto_bench"
+harness = false

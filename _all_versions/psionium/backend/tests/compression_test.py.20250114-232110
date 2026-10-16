@@ -1,0 +1,41 @@
+# tests/test_compression.py
+import os
+import sys
+from systems.compression.compression_system import CompressionSystem
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def test_various_file_types():
+    downloads_path = os.path.join(os.path.expanduser('~'), 'Downloads')
+    test_files = [
+        'sample.txt',
+        'image.jpg',
+        'document.pdf',
+        'audio.mp3',
+        'video.mp4'
+    ]
+
+    compression_system = CompressionSystem()
+
+    for file_name in test_files:
+        file_path = os.path.join(downloads_path, file_name)
+        if not os.path.exists(file_path):
+            print(f"File not found: {file_path}")
+            continue
+
+        with open(file_path, "rb") as file:
+            original_data = file.read()
+
+        # Compress the file
+        compressed_data = compression_system.compress_data(original_data, save_path=f"{file_path}.compressed")
+
+        # Decompress the file
+        decompressed_data = compression_system.decompress_data(compressed_data)
+
+        # Verify integrity
+        if original_data == decompressed_data:
+            print(f"Test passed for {file_name}")
+        else:
+            print(f"Test failed for {file_name}")
+
+if __name__ == "__main__":
+    test_various_file_types()

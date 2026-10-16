@@ -1,0 +1,306 @@
+import 'package:flutter/material.dart';
+import 'package:dio/dio.dart'; // Use Dio for HTTP requests
+import 'package:dio/adapter.dart'; // Import for DefaultHttpClientAdapter
+import 'package:http_parser/http_parser.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:dio/dio.dart'; // Main Dio import
+
+class CommandExecutionScreen extends StatefulWidget {
+  @override
+  _CommandExecutionScreenState createState() => _CommandExecutionScreenState();
+}
+
+class _CommandExecutionScreenState extends State<CommandExecutionScreen> {
+  final TextEditingController _commandController = TextEditingController();
+  List<String> _outputHistory = [];
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Test the public API when the screen loads
+    testPublicApi();
+  }
+
+  Future<void> testPublicApi() async {
+    try {
+      var dio = Dio();
+      var response = await dio.get('https://jsonplaceholder.typicode.com/posts/1');
+      print("Test Public API Response: ${response.data}");
+
+      setState(() {
+        _outputHistory.add("Public API Test: ${response.data}\n");
+      });
+    } catch (e) {
+      print("Test Public API Failed: $e");
+
+      setState(() {
+        _outputHistory.add("Public API Test Failed: $e\n");
+      });
+    }
+
+    _scrollToBottom();
+  }
+
+  Future<void> executeCommand(String command) async {
+    if (command.isEmpty) return;
+
+    setState(() {
+      _outputHistory.add("pSIONIUM> $command");
+    });
+
+    String backendUrl = 'https://2196-2607-fb91-bda8-c4a-5c67-e5a1-6a24-2317.ngrok-free.app/execute?command=$command';
+
+    print("Sending request to: $backendUrl"); // Debug log
+
+    try {
+      var dio = Dio();
+      (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
+        client.badCertificateCallback = (X509Certificate cert, String host, int port) => true; // Bypass SSL verification
+        return client;
+      };
+
+      var response = await dio.get(backendUrl);
+
+      print("Response status code: ${response.statusCode}"); // Debug log
+      print("Response body: ${response.data}"); // Debug log
+
+      if (response.statusCode == 200) {
+        var data = response.data;
+        setState(() {
+          _outputHistory.add("${data['result']}\n");
+        });
+      } else {
+        setState(() {
+          _outputHistory.add("Command execution failed: ${response.statusCode}\n");
+        });
+      }
+    } catch (e) {
+      print("Connection failed: $e"); // Debug log
+      setState(() {
+        _outputHistory.add("Connection failed: $e\n");
+      });
+    }
+
+    _commandController.clear();
+    _scrollToBottom();
+  }
+
+  Future<void> uploadFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+    if (result != null) {
+      File file = File(result.files.single.path!);
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('https://2196-2607-fb91-bda8-c4a-5c67-e5a1-6a24-2317.ngrok-free.app/upload'),
+      );
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          file.path,
+          contentType: MediaType('application', 'octet-stream'),
+        ),
+      );
+
+      try {
+        var response = await request.send();
+
+        if (response.statusCode == 200) {
+          setState(() {
+            _outputHistory.add("File uploaded successfully\n");
+          });
+        } else {
+          setState(() {
+            _outputHistory.add("File upload failed\n");
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _outputHistory.add("Connection failed: $e\n");
+        });
+      }
+    } else {
+      setState(() {
+        _outputHistory.add("No file selected\n");
+      });
+    }
+
+    _scrollToBottom();
+  }
+
+  Future<void> downloadFile(String filename) async {
+    try {
+      var dio = Dio();
+      (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate = (client) {
+        client.badCertificateCallback = (X509Certificate cert, String host, int port) => true; // Bypass SSL verification
+        return client;
+      };
+
+      var response = await dio.get(
+        'https://2196-2607-fb91-bda8-c4a-5c67-e5a1-6a24-2317.ngrok-free.app/download?file=$filename',
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      if (response.statusCode == 200) {
+        final directory = Directory.systemTemp;
+        final file = File('${directory.path}/$filename');
+        await file.writeAsBytes(response.data);
+
+        setState(() {
+          _outputHistory.add("File downloaded to: ${file.path}\n");
+        });
+      } else {
+        setState(() {
+          _outputHistory.add("File download failed\n");
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _outputHistory.add("Connection failed: $e\n");
+      });
+    }
+
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("pSIONIUM Terminal"),
+        backgroundColor: Colors.black,
+      ),
+      backgroundColor: Colors.black,
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                itemCount: _outputHistory.length,
+                itemBuilder: (context, index) {
+                  return Text(
+                    _outputHistory[index],
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commandController,
+                    decoration: InputDecoration(
+                      hintText: "Enter command...",
+                      hintStyle: TextStyle(color: Colors.green),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.green),
+                      ),
+                    ),
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSubmitted: (value) {
+                      executeCommand(value);
+                    },
+                  ),
+                ),
+                SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    executeCommand(_commandController.text);
+                  },
+                  child: Text(
+                    "Execute",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontFamily: 'Courier New',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: uploadFile,
+                    child: Text(
+                      "Upload File",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontFamily: 'Courier New',
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      downloadFile("test.txt");
+                    },
+                    child: Text(
+                      "Download File",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontFamily: 'Courier New',
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

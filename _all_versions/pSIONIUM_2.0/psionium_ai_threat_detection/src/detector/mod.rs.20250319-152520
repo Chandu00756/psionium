@@ -1,0 +1,97 @@
+use smartcore::linalg::basic::matrix::DenseMatrix;
+use smartcore::tree::decision_tree_classifier::DecisionTreeClassifier;
+use log::{info, warn};
+use serde::{Serialize, Deserialize};
+use bincode;
+
+// Serializable version of the decision tree model parameters
+#[derive(Serialize, Deserialize)]
+pub struct SerializableModel {
+    // Placeholder for model parameters (replace with actual tree structure later)
+    dummy_param: u32,
+}
+
+pub struct ThreatDetector {
+    model: DecisionTreeClassifier<f64, u32, DenseMatrix<f64>, Vec<u32>>,
+    feature_count: usize,
+    serializable_model: SerializableModel, // For serialization
+}
+
+impl ThreatDetector {
+    /// Initialize with a pre-trained decision tree model
+    pub fn new() -> Self {
+        let x = DenseMatrix::from_2d_array(&[
+            &[1.0, 2.0, 1.0],
+            &[10.0, 20.0, 5.0],
+            &[5.0, 10.0, 3.0],
+            &[15.0, 30.0, 7.0],
+        ]);
+        let y = vec![0, 1, 0, 1];
+        let model = DecisionTreeClassifier::fit(&x, &y, Default::default())
+            .expect("Failed to train decision tree");
+
+        info!("ThreatDetector initialized with pre-trained model");
+        ThreatDetector {
+            model,
+            feature_count: 3,
+            serializable_model: SerializableModel { dummy_param: 42 }, // Placeholder
+        }
+    }
+
+    /// Detect threats from input features
+    pub fn detect(&self, features: &[f64]) -> Result<bool, ThreatError> {
+        if features.len() != self.feature_count {
+            return Err(ThreatError::InvalidInput(format!(
+                "Expected {} features, got {}",
+                self.feature_count,
+                features.len()
+            )));
+        }
+        let x = DenseMatrix::from_2d_array(&[features]);
+        let prediction = self.model.predict(&x).expect("Prediction failed");
+        let is_threat = prediction[0] == 1;
+        if is_threat {
+            warn!("Threat detected with features: {:?}", features);
+        } else {
+            info!("No threat detected with features: {:?}", features);
+        }
+        Ok(is_threat)
+    }
+
+    /// Serialize the model for offline updates
+    pub fn serialize_model(&self) -> Result<Vec<u8>, ThreatError> {
+        let serialized = bincode::serialize(&self.serializable_model)
+            .map_err(|e| ThreatError::SerializationFailed(e.to_string()))?;
+        Ok(serialized)
+    }
+
+    /// Deserialize and update the model
+    pub fn update_model(&mut self, patch: Vec<u8>) -> Result<(), ThreatError> {
+        let deserialized: SerializableModel = bincode::deserialize(&patch)
+            .map_err(|e| ThreatError::DeserializationFailed(e.to_string()))?;
+        // For now, just log the update (expand with real parameter updates later)
+        info!("Model updated with dummy_param: {}", deserialized.dummy_param);
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum ThreatError {
+    InvalidInput(String),
+    PredictionFailed(String),
+    SerializationFailed(String),
+    DeserializationFailed(String),
+}
+
+impl std::fmt::Display for ThreatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ThreatError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
+            ThreatError::PredictionFailed(msg) => write!(f, "Prediction failed: {}", msg),
+            ThreatError::SerializationFailed(msg) => write!(f, "Serialization failed: {}", msg),
+            ThreatError::DeserializationFailed(msg) => write!(f, "Deserialization failed: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for ThreatError {}

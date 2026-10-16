@@ -1,0 +1,17 @@
+[package]
+name = "psionium_crypto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+oqs = "0.10.0"
+rand = "0.8.5"
+sgx_types = "1.1.2"
+sgx_tstd = "1.1.2"
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "crypto_bench"
+harness = false

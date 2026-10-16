@@ -1,0 +1,50 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+
+class FileManagementScreen extends StatelessWidget {
+  Future<void> uploadFile(File file) async {
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('http://localhost:8000/upload'),
+    );
+    request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+    var response = await request.send();
+    if (response.statusCode == 200) {
+      print('File uploaded!');
+    } else {
+      print('Upload failed');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("File Management"),
+      ),
+      body: ListView(
+        children: [
+          ListTile(
+            title: Text("Upload File"),
+            onTap: () async {
+              final picker = ImagePicker();
+              final pickedFile = await picker.getImage(source: ImageSource.gallery);
+              if (pickedFile != null) {
+                uploadFile(File(pickedFile.path));
+              }
+            },
+          ),
+          ListTile(
+            title: Text("Download File"),
+            onTap: () {
+              // Implement file download
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}

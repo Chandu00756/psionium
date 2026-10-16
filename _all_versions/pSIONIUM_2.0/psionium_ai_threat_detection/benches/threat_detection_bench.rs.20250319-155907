@@ -1,0 +1,18 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use psionium_ai_threat_detection::detector::ThreatDetector;
+use ed25519_dalek::pkcs8::PublicKey;
+
+fn bench_detection(c: &mut Criterion) {
+    let public_key = PublicKey::from_bytes(&[0; 32]).expect("Invalid public key");
+    let detector = ThreatDetector::new(public_key);
+    let features = vec![1.0, 2.0, 1.0];
+
+    c.bench_function("detect", |b| {
+        b.iter(|| {
+            detector.detect(black_box(&features)).unwrap();
+        })
+    });
+}
+
+criterion_group!(benches, bench_detection);
+criterion_main!(benches);

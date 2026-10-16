@@ -1,0 +1,47 @@
+use ed25519_dalek::{VerifyingKey, Signature, Verifier};
+use tokio::net::UnixStream;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use log::info;
+use anyhow::{Result, anyhow};
+
+pub struct IpcChannel {
+    verifying_key: VerifyingKey,
+    stream: UnixStream,
+}
+
+impl IpcChannel {
+    pub async fn new(verifying_key: VerifyingKey, socket_path: &str) -> Result<Self> {
+        let stream = UnixStream::connect(socket_path).await?;
+        info!("Initialized government-grade IPC channel with zero-trust authentication");
+        Ok(IpcChannel { verifying_key, stream })
+    }
+
+    pub async fn send_response(&mut self, data: &[u8], sig_bytes: &[u8]) -> Result<()> {
+        let signature_bytes: [u8; 64] = sig_bytes.try_into().map_err(|_| anyhow!("Invalid signature length"))?;
+        let signature = Signature::from_bytes(&signature_bytes);
+        self.verifying_key.verify(data, &signature).map_err(|e| anyhow!("Signature verification failed: {}", e))?;
+
+        let msg = [data, sig_bytes].concat();
+        self.stream.write_all(&msg).await?;
+        self.stream.flush().await?;
+        info!("Sent encrypted response over IPC channel");
+        Ok(())
+    }
+
+    pub async fn receive_response(&mut self) -> Result<Vec<u8>> {
+        let mut buffer = vec![0u8; 1024];
+        let n = self.stream.read(&mut buffer).await?;
+        let received_data = buffer[..n].to_vec();
+
+        if received_data.len() < 64 {
+            return Err(anyhow!("Received data too short for signature"));
+        }
+        let (data, sig_bytes) = received_data.split_at(received_data.len() - 64);
+        let signature_bytes: [u8; 64] = sig_bytes.try_into().map_err(|_| anyhow!("Invalid signature length"))?;
+        let signature = Signature::from_bytes(&signature_bytes);
+        self.verifying_key.verify(data, &signature).map_err(|e| anyhow!("Signature verification failed: {}", e))?;
+
+        info!("Received and verified response over IPC channel");
+        Ok(data.to_vec())
+    }
+}

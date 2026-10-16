@@ -1,0 +1,56 @@
+#[cfg(test)]
+mod tests {
+    use crate::response::{ResponseEngine, ThreatError}; // Fixed import
+    use crate::ipc::IpcChannel; // Fixed import
+    use psionium_crypto_engine::crypto::PsioniumCrypto;
+    use psionium_ai_threat_detection::detector::ThreatDetector;
+    use ed25519_dalek::{SigningKey, VerifyingKey, Signer}; // Added Signer
+    use rand::RngCore; // Fixed rand import
+    use rand::thread_rng; // Added for thread_rng
+    use tokio::test as tokio_test;
+    use log::info;
+    use std::sync::Arc;
+
+    fn setup_logger() {
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    }
+
+    #[tokio_test]
+    async fn test_handle_threat_success() {
+        setup_logger();
+        let mut rng = thread_rng();
+        let mut secret = [0u8; 32];
+        rng.fill_bytes(&mut secret);
+        let signing_key = SigningKey::from_bytes(&secret);
+        let crypto = PsioniumCrypto::new().expect("Crypto init failed");
+        let detector = ThreatDetector::new(signing_key.verifying_key());
+        let engine = ResponseEngine::new(crypto, detector, signing_key);
+
+        let threat_data = vec![15.0, 30.0, 7.0]; // Simulated threat
+        let result = engine.handle_threat(1234, &threat_data).await;
+        assert!(result.is_ok(), "Expected successful threat handling, got {:?}", result);
+        info!("Threat handling test passed successfully");
+    }
+
+    #[tokio_test]
+    async fn test_ipc_send_receive() {
+        setup_logger();
+        let mut rng = thread_rng();
+        let mut secret = [0u8; 32];
+        rng.fill_bytes(&mut secret);
+        let signing_key = SigningKey::from_bytes(&secret);
+        let verifying_key = signing_key.verifying_key();
+        let ipc = Arc::new(IpcChannel::new(verifying_key));
+
+        let data = b"Test IPC message";
+        let signature = signing_key.sign(data); // Now works with Signer
+
+        let send_result = ipc.send_response(data, signature.as_ref()).await;
+        assert!(send_result.is_ok(), "IPC send failed: {:?}", send_result);
+
+        let received_data = ipc.receive_response().await;
+        assert!(received_data.is_ok(), "IPC receive failed: {:?}", received_data);
+        assert_eq!(received_data.unwrap(), data, "Received data does not match sent data");
+        info!("IPC send/receive test passed successfully");
+    }
+}

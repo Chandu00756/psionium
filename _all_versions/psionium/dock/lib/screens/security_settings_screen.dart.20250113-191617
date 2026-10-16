@@ -1,0 +1,34 @@
+import 'package:flutter/material.dart';
+
+class SecuritySettingsScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Security Settings"),
+      ),
+      body: ListView(
+        children: [
+          ListTile(
+            title: Text("Enable Quantum-Resilient Encryption"),
+            trailing: Switch(
+              value: true,
+              onChanged: (value) {
+                // Toggle encryption setting
+              },
+            ),
+          ),
+          ListTile(
+            title: Text("Enable Dynamic Dimensional Encoding (DDED)"),
+            trailing: Switch(
+              value: false,
+              onChanged: (value) {
+                // Toggle DDED setting
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

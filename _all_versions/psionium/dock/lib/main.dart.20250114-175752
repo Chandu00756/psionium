@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+import 'package:page_transition/page_transition.dart';
+import 'screens/home_screen.dart';
+import 'screens/file_management_screen.dart';
+import 'screens/encrypt_decrypt.dart';
+import 'screens/key_management_screen.dart';
+import 'screens/threat_management_screen.dart';
+import 'screens/workflow_automation_screen.dart';
+import 'screens/billing_screen.dart';
+import 'screens/security_settings_screen.dart';
+import 'dart:ui'; // Add this line
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'pSIONIUM Dock',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFF00FFA3), // Modern teal accent
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: MainNavigationScreen(),
+    );
+  }
+}
+
+class MainNavigationScreen extends StatefulWidget {
+  @override
+  _MainNavigationScreenState createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  int _selectedIndex = 0;
+  bool _isNavBarVisible = true;
+
+  // List of screens
+  final List<Widget> _screens = [
+    HomeScreen(),
+    FileManagementScreen(),
+    EncryptionScreen(),
+    KeyManagementScreen(),
+    ThreatManagementScreen(),
+    WorkflowAutomationScreen(),
+    BillingScreen(),
+    SecuritySettingsScreen(),
+  ];
+
+  // Unique icons for the navigation bar
+  final List<IconData> _navIcons = [
+    Icons.home,
+    Icons.folder,
+    Icons.lock,
+    Icons.vpn_key,
+    Icons.security,
+    Icons.work,
+    Icons.credit_card,
+    Icons.settings,
+  ];
+
+  // Labels for the navigation bar
+  final List<String> _navLabels = [
+    "Home",
+    "Files",
+    "Encrypt",
+    "Keys",
+    "Threats",
+    "Workflow",
+    "Billing",
+    "Settings",
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  void _toggleNavBar() {
+    setState(() {
+      _isNavBarVisible = !_isNavBarVisible;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Color(0xFF0A0E21), // Dark background
+      body: _screens[_selectedIndex],
+      bottomNavigationBar: AnimatedContainer(
+        duration: Duration(milliseconds: 300),
+        height: _isNavBarVisible ? 90 : 0,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 20,
+              spreadRadius: 5,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+              child: BottomNavigationBar(
+                backgroundColor: Colors.transparent,
+                selectedItemColor: Color(0xFF00FFA3), // Teal accent
+                unselectedItemColor: Colors.white.withOpacity(0.5),
+                currentIndex: _selectedIndex,
+                onTap: _onItemTapped,
+                type: BottomNavigationBarType.fixed,
+                elevation: 0,
+                items: List.generate(
+                  _navIcons.length,
+                  (index) => BottomNavigationBarItem(
+                    icon: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: _selectedIndex == index
+                            ? LinearGradient(
+                                colors: [Color(0xFF00FFA3), Color(0xFF00E676)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        _navIcons[index],
+                        size: 24,
+                      ),
+                    ),
+                    label: _navLabels[index],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _toggleNavBar,
+        child: Icon(
+          _isNavBarVisible ? Icons.arrow_downward : Icons.arrow_upward,
+          color: Colors.black,
+        ),
+        backgroundColor: Color(0xFF00FFA3), // Teal accent
+      ),
+    );
+  }
+}

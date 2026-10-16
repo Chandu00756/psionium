@@ -1,0 +1,23 @@
+name: dock
+description: A desktop application for pSIONIUM Dock.
+
+publish_to: 'none' # Remove this line if you want to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.12.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  image_picker: ^0.8.7+4  # For picking files from the device
+  path_provider: ^2.0.15  # For accessing the downloads directory
+  http: ^0.13.3  # For API calls
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

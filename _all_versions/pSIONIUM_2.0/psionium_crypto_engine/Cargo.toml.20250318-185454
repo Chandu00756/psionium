@@ -1,0 +1,29 @@
+[package]
+name = "psionium_crypto_engine"
+version = "0.1.0"
+edition = "2021"
+description = "Quantum-resistant encryption engine for government-grade security"
+license = "MIT"
+
+[dependencies]
+oqs = "0.10.0"
+rand = "0.8.5"
+log = "0.4.21"
+env_logger = "0.11.3"
+serde = { version = "1.0.197", features = ["derive"] }
+bincode = "1.3.3"
+thiserror = "1.0.58"
+ring = "0.17.8"
+libc = "0.2.155"
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[[bench]]
+name = "crypto_bench"
+harness = false

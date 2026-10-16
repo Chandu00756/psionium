@@ -1,0 +1,41 @@
+use super::detector::{ThreatDetector, ThreatError};
+use log::info;
+
+#[test]
+fn test_threat_detection() {
+    env_logger::init();
+    let detector = ThreatDetector::new();
+
+    // Normal behavior
+    let normal_features = vec![1.0, 2.0, 1.0];
+    let result = detector.detect(&normal_features).expect("Detection failed");
+    assert!(!result, "Normal behavior should not be flagged as a threat");
+    info!("Normal behavior test passed");
+
+    // Threat behavior
+    let threat_features = vec![15.0, 30.0, 7.0];
+    let result = detector.detect(&threat_features).expect("Detection failed");
+    assert!(result, "Threat behavior should be flagged");
+    info!("Threat detection test passed");
+}
+
+#[test]
+fn test_invalid_features() {
+    env_logger::init();
+    let detector = ThreatDetector::new();
+
+    let invalid_features = vec![1.0, 2.0]; // Too few features
+    let result = detector.detect(&invalid_features);
+    assert!(result.is_err(), "Invalid feature count should fail");
+    info!("Invalid features test passed");
+}
+
+#[test]
+fn test_model_serialization() {
+    env_logger::init();
+    let detector = ThreatDetector::new();
+    let serialized = detector.serialize_model().expect("Serialization failed");
+    let mut updated_detector = ThreatDetector::new();
+    updated_detector.update_model(serialized).expect("Deserialization failed");
+    info!("Model serialization test passed");
+}

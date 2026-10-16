@@ -1,0 +1,72 @@
+use super::crypto::PsioniumCrypto;
+use super::enclave::PsioniumEnclave;
+use std::fs;
+use log::info;
+use ring::aead::NONCE_LEN;
+use std::sync::Once;
+
+static INIT_LOGGER: Once = Once::new();
+
+fn init_logger() {
+    INIT_LOGGER.call_once(|| {
+        env_logger::init();
+    });
+}
+
+#[test]
+fn test_full_encryption_cycle() {
+    init_logger();
+    let crypto = PsioniumCrypto::new().expect("Crypto init failed");
+    let key_blob = crypto.export_keys().expect("Key export failed");
+    let mut enclave = PsioniumEnclave::new(key_blob.len()).expect("Enclave init failed");
+
+    let plaintext = b"Highly Classified Government Data";
+    fs::write("secret.txt", plaintext).expect("Failed to write test file");
+    let file_data = fs::read("secret.txt").expect("Failed to read test file");
+
+    let (ciphertext, encrypted_data, nonce) = crypto.encrypt(&file_data).expect("Encryption failed");
+    enclave.store_key(key_blob).expect("Key store failed");
+
+    let decrypted_data = crypto.decrypt(&ciphertext, &encrypted_data, &nonce).expect("Decryption failed");
+
+    assert_eq!(file_data, decrypted_data);
+    info!("Full encryption cycle passed with protected enclave!");
+}
+
+#[test]
+fn test_large_data_encryption() {
+    init_logger();
+    let crypto = PsioniumCrypto::new().expect("Crypto init failed");
+    let key_blob = crypto.export_keys().expect("Key export failed");
+    let mut enclave = PsioniumEnclave::new(key_blob.len()).expect("Enclave init failed");
+
+    let plaintext = vec![0u8; 1024 * 1024]; // 1 MB
+    let (ciphertext, encrypted_data, nonce) = crypto.encrypt(&plaintext).expect("Encryption failed");
+    enclave.store_key(key_blob).expect("Key store failed");
+
+    let decrypted_data = crypto.decrypt(&ciphertext, &encrypted_data, &nonce).expect("Decryption failed");
+    assert_eq!(plaintext, decrypted_data);
+    info!("Large data encryption cycle passed!");
+}
+
+#[test]
+fn test_invalid_nonce() {
+    init_logger();
+    let crypto = PsioniumCrypto::new().expect("Crypto init failed");
+    let plaintext = b"Test Data";
+    let (ciphertext, encrypted_data, _nonce) = crypto.encrypt(plaintext).expect("Encryption failed");
+
+    let wrong_nonce = vec![0u8; NONCE_LEN];
+    let result = crypto.decrypt(&ciphertext, &encrypted_data, &wrong_nonce);
+    assert!(result.is_err(), "Decryption with wrong nonce should fail");
+    info!("Invalid nonce test passed!");
+}
+
+#[test]
+fn test_empty_enclave() {
+    init_logger();
+    let enclave = PsioniumEnclave::new(1024).expect("Enclave init failed");
+    let result = enclave.retrieve_key();
+    assert!(result.is_err(), "Retrieving from empty enclave should fail");
+    info!("Empty enclave test passed!");
+}

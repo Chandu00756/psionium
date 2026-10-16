@@ -1,0 +1,33 @@
+from modules.encoding_module import EncodingModule
+
+class EncodingSystem:
+    def __init__(self, encoding_type="base64"):
+        self.encoding_module = EncodingModule(encoding_type)
+
+    def process(self, data):
+        """
+        Process the input data by encoding it.
+        :param data: Raw data (bytes or string).
+        :return: Encoded data (string).
+        """
+        try:
+            encoded_data = self.encoding_module.encode(data)
+            print(f"Data encoded successfully: {encoded_data}")
+            return encoded_data
+        except Exception as e:
+            print(f"Error during encoding: {e}")
+            raise
+
+    def reverse_process(self, encoded_data):
+        """
+        Reverse the encoding process.
+        :param encoded_data: Encoded data (string).
+        :return: Decoded data (bytes).
+        """
+        try:
+            decoded_data = self.encoding_module.decode(encoded_data)
+            print(f"Data decoded successfully: {decoded_data.decode('utf-8')}")
+            return decoded_data
+        except Exception as e:
+            print(f"Error during decoding: {e}")
+            raise

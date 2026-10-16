@@ -1,0 +1,29 @@
+[package]
+name = "psionium_ai_threat_detection"
+version = "0.1.0"
+edition = "2021"
+description = "AI-driven threat detection module for Psionium"
+license = "MIT"
+
+[dependencies]
+smartcore = "0.3.2"       # Advanced AI models (random forest)
+log = "0.4.21"            # Logging for auditing and compliance
+env_logger = "0.11.3"     # Console logging integration
+serde = { version = "1.0.197", features = ["derive"] }  # Secure serialization
+bincode = "1.3.3"         # Binary encoding for model updates
+notify = "6.1.1"          # Real-time file system monitoring
+ed25519-dalek = "2.0.0"   # Cryptographic signatures for secure updates
+tokio = { version = "1.40.0", features = ["full"] }  # Asynchronous runtime for efficiency
+rand = "0.8.5"            # Randomness for testing (optional)
+
+[dev-dependencies]
+criterion = "0.5.1"       # Performance benchmarking
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[[bench]]
+name = "threat_detection_bench"
+harness = false

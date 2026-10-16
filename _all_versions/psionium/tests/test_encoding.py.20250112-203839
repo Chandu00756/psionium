@@ -1,0 +1,29 @@
+from encoding_module import EncodingModule
+
+# Test Base64 encoding/decoding
+def test_base64():
+    encoder = EncodingModule(encoding_type="base64")
+    data = "Hello, pSIONIUM!"
+    encoded_data = encoder.encode(data)
+    decoded_data = encoder.decode(encoded_data)
+    print(f"Original: {data}")
+    print(f"Encoded (Base64): {encoded_data}")
+    print(f"Decoded: {decoded_data.decode('utf-8')}")
+    assert decoded_data.decode('utf-8') == data, "Base64 test failed!"
+
+# Test Hexadecimal encoding/decoding
+def test_hex():
+    encoder = EncodingModule(encoding_type="hex")
+    data = "Hello, pSIONIUM!"
+    encoded_data = encoder.encode(data)
+    decoded_data = encoder.decode(encoded_data)
+    print(f"Original: {data}")
+    print(f"Encoded (Hex): {encoded_data}")
+    print(f"Decoded: {decoded_data.decode('utf-8')}")
+    assert decoded_data.decode('utf-8') == data, "Hex test failed!"
+
+# Run tests
+if __name__ == "__main__":
+    test_base64()
+    test_hex()
+    print("All tests passed!")

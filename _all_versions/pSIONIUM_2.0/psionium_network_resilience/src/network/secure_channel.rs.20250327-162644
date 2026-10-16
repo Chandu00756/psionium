@@ -1,0 +1,89 @@
+use anyhow::{anyhow, Result};
+use pqcrypto_kyber::kyber1024::{keypair as kyber_keypair, encapsulate, decapsulate, PublicKey, SecretKey, Ciphertext, SharedSecret};
+use pqcrypto_traits::kem::SharedSecret; // Import the trait to use as_bytes
+use rand::Rng;
+use sha2::Sha512;
+use hkdf::Hkdf;
+
+// Define a simple SigningKey and VerifyingKey for this example (replace with your actual types)
+#[derive(Clone)]
+struct SigningKey([u8; 32]);
+#[derive(Clone)]
+struct VerifyingKey([u8; 32]);
+
+impl SigningKey {
+    fn new() -> Self {
+        SigningKey(rand::thread_rng().gen::<[u8; 32]>())
+    }
+}
+
+impl VerifyingKey {
+    fn new() -> Self {
+        VerifyingKey(rand::thread_rng().gen::<[u8; 32]>())
+    }
+}
+
+pub struct SecureChannel {
+    aes_key: [u8; 32],
+    signing_key: SigningKey,
+    verifying_key: VerifyingKey,
+    addr: String,
+}
+
+impl SecureChannel {
+    pub async fn new(signing_key: SigningKey, verifying_key: VerifyingKey, addr: &str) -> Result<Self> {
+        // Generate Kyber key pairs for initiator and responder
+        let (kyber_pub_initiator, kyber_sec_initiator): (PublicKey, SecretKey) = kyber_keypair();
+        let (kyber_pub_responder, kyber_sec_responder): (PublicKey, SecretKey) = kyber_keypair();
+
+        // Perform key encapsulation: encapsulate returns (SharedSecret, Ciphertext)
+        let (shared_secret_initiator, ciphertext): (SharedSecret, Ciphertext) = encapsulate(&kyber_pub_responder);
+
+        // Perform key decapsulation to get the responder's shared secret
+        let shared_secret_responder: SharedSecret = decapsulate(&ciphertext, &kyber_sec_responder);
+
+        // Verify that both shared secrets match
+        if shared_secret_initiator.as_bytes() != shared_secret_responder.as_bytes() {
+            return Err(anyhow!("Shared secret mismatch in Kyber key exchange"));
+        }
+
+        // Generate a random salt for key derivation
+        let salt = rand::thread_rng().gen::<[u8; 32]>();
+
+        // Derive the AES key using HKDF
+        let aes_key = derive_aes_key(shared_secret_initiator.as_bytes(), &salt)?;
+
+        Ok(SecureChannel {
+            aes_key,
+            signing_key,
+            verifying_key,
+            addr: addr.to_string(),
+        })
+    }
+
+    // Example method to demonstrate usage
+    pub fn get_aes_key(&self) -> &[u8; 32] {
+        &self.aes_key
+    }
+}
+
+// Function to derive an AES key using HKDF with SHA-512
+fn derive_aes_key(shared_secret: &[u8], salt: &[u8]) -> Result<[u8; 32]> {
+    let hkdf = Hkdf::<Sha512>::new(Some(salt), shared_secret);
+    let mut aes_key = [0u8; 32]; // Properly initialized array
+    hkdf.expand(b"SecureChannel AES-256 Key", &mut aes_key)
+        .map_err(|_| anyhow!("HKDF key derivation failed"))?;
+    Ok(aes_key)
+}
+
+// Main function to test the implementation
+#[tokio::main]
+async fn main() -> Result<()> {
+    let signing_key = SigningKey::new();
+    let verifying_key = VerifyingKey::new();
+    let addr = "example.com";
+
+    let channel = SecureChannel::new(signing_key, verifying_key, addr).await?;
+    println!("AES Key: {:?}", channel.get_aes_key());
+    Ok(())
+}

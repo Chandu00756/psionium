@@ -1,0 +1,83 @@
+use oqs::kem::{Kem, Algorithm};
+use ring::aead::{LessSafeKey, UnboundKey, NONCE_LEN, AES_256_GCM};
+use crate::utils::{PsioniumError, generate_entropy};
+use log::info;
+use serde::{Serialize, Deserialize};
+use bincode;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CryptoKeys {
+    public_key: Vec<u8>,
+    secret_key: Vec<u8>,
+}
+
+pub struct PsioniumCrypto {
+    kem: Kem,
+    keypair: CryptoKeys,
+}
+
+impl PsioniumCrypto {
+    pub fn new() -> Result<Self, PsioniumError> {
+        oqs::init();
+        let kem = Kem::new(Algorithm::Kyber1024)
+            .map_err(|e| PsioniumError::CryptoInit(e.to_string()))?;
+        let (public_key, secret_key) = kem.keypair()
+            .map_err(|e| PsioniumError::KeyGen(e.to_string()))?;
+
+        info!("PsioniumCrypto initialized with Kyber-1024");
+        Ok(PsioniumCrypto {
+            kem,
+            keypair: CryptoKeys {
+                public_key: public_key.into_vec(),
+                secret_key: secret_key.into_vec(),
+            },
+        })
+    }
+
+    pub fn encrypt(&self, plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), PsioniumError> {
+        let pub_key = self.kem.public_key_from_bytes(&self.keypair.public_key)
+            .ok_or(PsioniumError::KeyLoad("Invalid public key".into()))?;
+        let (ciphertext, shared_secret) = self.kem.encapsulate(pub_key)
+            .map_err(|e| PsioniumError::Encryption(e.to_string()))?;
+
+        let aead_key = UnboundKey::new(&AES_256_GCM, &shared_secret.into_vec())
+            .map_err(|e| PsioniumError::SymmetricCrypto(e.to_string()))?;
+        let aead = LessSafeKey::new(aead_key);
+
+        let nonce = generate_entropy(NONCE_LEN);
+        let mut in_out = plaintext.to_vec();
+        aead.seal_in_place_append_tag(
+            ring::aead::Nonce::assume_unique_for_key(nonce.clone().try_into().map_err(|_| PsioniumError::SymmetricCrypto("Invalid nonce".into()))?),
+            ring::aead::Aad::empty(),
+            &mut in_out,
+        ).map_err(|e| PsioniumError::SymmetricCrypto(e.to_string()))?;
+
+        Ok((ciphertext.into_vec(), in_out, nonce))
+    }
+
+    pub fn decrypt(&self, ciphertext: &[u8], encrypted_data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, PsioniumError> {
+        let sec_key = self.kem.secret_key_from_bytes(&self.keypair.secret_key)
+            .ok_or(PsioniumError::KeyLoad("Invalid secret key".into()))?;
+        let ct = self.kem.ciphertext_from_bytes(ciphertext)
+            .ok_or(PsioniumError::Decryption("Invalid ciphertext".into()))?;
+        let shared_secret = self.kem.decapsulate(sec_key, ct)
+            .map_err(|e| PsioniumError::Decryption(e.to_string()))?;
+
+        let aead_key = UnboundKey::new(&AES_256_GCM, &shared_secret.into_vec())
+            .map_err(|e| PsioniumError::SymmetricCrypto(e.to_string()))?;
+        let aead = LessSafeKey::new(aead_key);
+
+        let mut in_out = encrypted_data.to_vec();
+        let plaintext = aead.open_in_place(
+            ring::aead::Nonce::assume_unique_for_key(nonce.try_into().map_err(|_| PsioniumError::SymmetricCrypto("Invalid nonce".into()))?),
+            ring::aead::Aad::empty(),
+            &mut in_out,
+        ).map_err(|e| PsioniumError::SymmetricCrypto(e.to_string()))?;
+
+        Ok(plaintext.to_vec())
+    }
+
+    pub fn export_keys(&self) -> Result<Vec<u8>, PsioniumError> {
+        bincode::serialize(&self.keypair).map_err(|e| PsioniumError::Serialization(e.to_string()))
+    }
+}

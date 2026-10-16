@@ -1,0 +1,612 @@
+import 'package:flutter/material.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:page_transition/page_transition.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
+void main() {
+  runApp(MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: HomeScreen(),
+    theme: ThemeData.dark().copyWith(
+      scaffoldBackgroundColor: Colors.black,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.black,
+        elevation: 0,
+      ),
+    ),
+  ));
+}
+
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  bool _isDarkMode = true;
+  List<NotificationItem> _notifications = [
+    NotificationItem(
+      icon: Icons.warning,
+      title: "Quantum threat detected",
+      subtitle: "10 minutes ago",
+      color: Colors.red,
+    ),
+    NotificationItem(
+      icon: Icons.link,
+      title: "Blockchain transaction completed",
+      subtitle: "1 hour ago",
+      color: Colors.blue,
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 1000),
+    );
+    _animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _isDarkMode ? Colors.black : Colors.grey[200],
+      appBar: AppBar(
+        title: Text(
+          "pSIONIUM Dock",
+          style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 24),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.notifications, color: Colors.green),
+            onPressed: _showNotificationsDialog,
+          ),
+          IconButton(
+            icon: Icon(Icons.search, color: Colors.green),
+            onPressed: _openGlobalSearch,
+          ),
+          IconButton(
+            icon: Icon(_isDarkMode ? Icons.light_mode : Icons.dark_mode, color: Colors.green),
+            onPressed: () {
+              setState(() {
+                _isDarkMode = !_isDarkMode;
+              });
+            },
+          ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.account_circle, color: Colors.green),
+            onSelected: (value) {
+              if (value == "logout") {
+                _handleLogout();
+              } else if (value == "settings") {
+                _navigateToSettings();
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return [
+                PopupMenuItem(
+                  value: "profile",
+                  child: Text("Profile"),
+                ),
+                PopupMenuItem(
+                  value: "settings",
+                  child: Text("Settings"),
+                ),
+                PopupMenuItem(
+                  value: "logout",
+                  child: Text("Logout"),
+                ),
+              ];
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FadeTransition(
+                opacity: _animation,
+                child: _buildDashboardSection(),
+              ).animate().fadeIn(duration: 500.ms),
+              SizedBox(height: 20),
+              FadeTransition(
+                opacity: _animation,
+                child: _buildQuickActionsSection(),
+              ).animate().fadeIn(duration: 500.ms),
+              SizedBox(height: 20),
+              FadeTransition(
+                opacity: _animation,
+                child: _buildNotificationsSection(),
+              ).animate().fadeIn(duration: 500.ms),
+              SizedBox(height: 20),
+              FadeTransition(
+                opacity: _animation,
+                child: _buildSystemHealthSection(),
+              ).animate().fadeIn(duration: 500.ms),
+              SizedBox(height: 20),
+              FadeTransition(
+                opacity: _animation,
+                child: _buildFileStorageOverview(),
+              ).animate().fadeIn(duration: 500.ms),
+              SizedBox(height: 20),
+              FadeTransition(
+                opacity: _animation,
+                child: _buildAIRecommendations(),
+              ).animate().fadeIn(duration: 500.ms),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardSection() {
+    return Card(
+      color: _isDarkMode ? Colors.grey[900] : Colors.white,
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Dashboard",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildUsageChart(),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: _buildRecentActivities(),
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
+            _buildQuantumResilientBadge(),
+            SizedBox(height: 10),
+            _buildBlockchainExplorer(),
+            SizedBox(height: 10),
+            _buildAIInsights(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUsageChart() {
+    return SfCartesianChart(
+      primaryXAxis: CategoryAxis(),
+      series: <ChartSeries>[
+        LineSeries<ChartData, String>(
+          dataSource: [
+            ChartData('Mon', 35),
+            ChartData('Tue', 28),
+            ChartData('Wed', 34),
+            ChartData('Thu', 32),
+            ChartData('Fri', 40),
+          ],
+          xValueMapper: (ChartData data, _) => data.day,
+          yValueMapper: (ChartData data, _) => data.usage,
+          color: Colors.green,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentActivities() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Recent Activities",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _isDarkMode ? Colors.white : Colors.black),
+        ),
+        SizedBox(height: 10),
+        ListTile(
+          leading: Icon(Icons.upload, color: Colors.green),
+          title: Text("Uploaded file.txt", style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black)),
+          subtitle: Text("2 hours ago", style: TextStyle(color: Colors.grey)),
+        ),
+        ListTile(
+          leading: Icon(Icons.lock, color: Colors.green),
+          title: Text("Encrypted secret.key", style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black)),
+          subtitle: Text("4 hours ago", style: TextStyle(color: Colors.grey)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuantumResilientBadge() {
+    return Row(
+      children: [
+        Icon(Icons.security, color: Colors.green),
+        SizedBox(width: 10),
+        Text(
+          "Quantum-Resilient Encryption: Enabled",
+          style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBlockchainExplorer() {
+    return InkWell(
+      onTap: _navigateToBlockchainExplorer,
+      child: Row(
+        children: [
+          Icon(Icons.link, color: Colors.blue),
+          SizedBox(width: 10),
+          Text(
+            "View Blockchain Transactions",
+            style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAIInsights() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "AI Insights",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _isDarkMode ? Colors.white : Colors.black),
+        ),
+        SizedBox(height: 10),
+        Text(
+          "You have 5 unprotected files. Encrypt them now!",
+          style: TextStyle(color: Colors.orange),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionsSection() {
+    return Card(
+      color: _isDarkMode ? Colors.grey[900] : Colors.white,
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Quick Actions",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _buildQuickActionButton(Icons.upload, "Upload File", _navigateToFileUpload),
+                _buildQuickActionButton(Icons.lock, "Encrypt File", _navigateToEncryption),
+                _buildQuickActionButton(Icons.security, "Quantum-Resilient Encrypt", _handleQuantumResilientEncryption),
+                _buildQuickActionButton(Icons.link, "Blockchain Audit", _navigateToBlockchainAudit),
+                _buildQuickActionButton(Icons.insights, "AI Insights", _navigateToAIInsights),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionButton(IconData icon, String label, VoidCallback onPressed) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, color: Colors.black),
+      label: Text(label, style: TextStyle(color: Colors.black)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green,
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      ),
+    );
+  }
+
+  Widget _buildNotificationsSection() {
+    return Card(
+      color: _isDarkMode ? Colors.grey[900] : Colors.white,
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Notifications",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _notifications.clear();
+                    });
+                  },
+                  child: Text(
+                    "Clear All",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 10),
+            ..._notifications.map((notification) {
+              return ListTile(
+                leading: Icon(notification.icon, color: notification.color),
+                title: Text(notification.title, style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black)),
+                subtitle: Text(notification.subtitle, style: TextStyle(color: Colors.grey)),
+                trailing: IconButton(
+                  icon: Icon(Icons.close, color: _isDarkMode ? Colors.white : Colors.black),
+                  onPressed: () {
+                    setState(() {
+                      _notifications.remove(notification);
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSystemHealthSection() {
+    return Card(
+      color: _isDarkMode ? Colors.grey[900] : Colors.white,
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "System Health",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSystemHealthMetric("Quantum-Resilient", "100%", Colors.green),
+                ),
+                Expanded(
+                  child: _buildSystemHealthMetric("Blockchain", "95%", Colors.blue),
+                ),
+                Expanded(
+                  child: _buildSystemHealthMetric("AI", "90%", Colors.orange),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSystemHealthMetric(String label, String value, Color color) {
+    return Column(
+      children: [
+        CircularProgressIndicator(
+          value: double.parse(value.replaceAll('%', '')) / 100,
+          backgroundColor: Colors.grey[800],
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+        ),
+        SizedBox(height: 10),
+        Text(label, style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black)),
+        Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildFileStorageOverview() {
+    return Card(
+      color: _isDarkMode ? Colors.grey[900] : Colors.white,
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Storage Overview",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: 0.7, // Example: 70% storage used
+              backgroundColor: Colors.grey[800],
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+            ),
+            SizedBox(height: 10),
+            Text(
+              "7 GB of 10 GB used",
+              style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAIRecommendations() {
+    return Card(
+      color: _isDarkMode ? Colors.grey[900] : Colors.white,
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "AI Recommendations",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            Text(
+              "1. Encrypt 5 unprotected files.",
+              style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black),
+            ),
+            Text(
+              "2. Review recent blockchain transactions.",
+              style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showNotificationsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Notifications"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: _notifications.map((notification) {
+              return ListTile(
+                leading: Icon(notification.icon, color: notification.color),
+                title: Text(notification.title),
+                subtitle: Text(notification.subtitle),
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text("Close"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openGlobalSearch() {
+    showSearch(
+      context: context,
+      delegate: GlobalSearchDelegate(),
+    );
+  }
+
+  void _handleLogout() {
+    // Implement logout logic
+  }
+
+  void _navigateToSettings() {
+    // Navigate to settings screen
+  }
+
+  void _navigateToBlockchainExplorer() {
+    // Navigate to blockchain explorer
+  }
+
+  void _handleQuantumResilientEncryption() {
+    // Handle quantum-resilient encryption
+  }
+
+  void _navigateToBlockchainAudit() {
+    // Navigate to blockchain audit
+  }
+
+  void _navigateToAIInsights() {
+    // Navigate to AI insights
+  }
+
+  void _navigateToFileUpload() {
+    // Navigate to file upload screen
+  }
+
+  void _navigateToEncryption() {
+    // Navigate to encryption screen
+  }
+}
+
+class NotificationItem {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+
+  NotificationItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+}
+
+class GlobalSearchDelegate extends SearchDelegate<String> {
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, null!);
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return Center(
+      child: Text("Search Results for: $query"),
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return Center(
+      child: Text("Suggestions for: $query"),
+    );
+  }
+}
+
+class ChartData {
+  final String day;
+  final int usage;
+
+  ChartData(this.day, this.usage);
+}

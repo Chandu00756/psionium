@@ -1,0 +1,160 @@
+import 'package:flutter/material.dart';
+import 'package:page_transition/page_transition.dart';
+import 'dart:ui'; // For ImageFilter
+import 'screens/home_screen.dart';
+import 'screens/file_management_screen.dart';
+import 'screens/encrypt_decrypt.dart';
+import 'screens/key_management_screen.dart';
+import 'screens/threat_management_screen.dart';
+import 'screens/workflow_automation_screen.dart';
+import 'screens/billing_screen.dart';
+import 'screens/security_settings_screen.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'pSIONIUM Dock',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFF00FFA3), // Modern teal accent
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: MainNavigationScreen(),
+    );
+  }
+}
+
+class MainNavigationScreen extends StatefulWidget {
+  @override
+  _MainNavigationScreenState createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  int _selectedIndex = 0;
+
+  // List of screens
+  final List<Widget> _screens = [
+    HomeScreen(),
+    FileManagementScreen(),
+    EncryptionScreen(),
+    KeyManagementScreen(),
+    ThreatManagementScreen(),
+    WorkflowAutomationScreen(),
+    BillingScreen(),
+    SecuritySettingsScreen(),
+  ];
+
+  // Unique icons for the navigation bar
+  final List<IconData> _navIcons = [
+    Icons.home,
+    Icons.folder,
+    Icons.lock,
+    Icons.vpn_key,
+    Icons.security,
+    Icons.work,
+    Icons.credit_card,
+    Icons.settings,
+  ];
+
+  // Labels for the navigation bar
+  final List<String> _navLabels = [
+    "Home",
+    "Files",
+    "Encrypt",
+    "Keys",
+    "Threats",
+    "Workflow",
+    "Billing",
+    "Settings",
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Color(0xFF0A0E21), // Dark background
+      body: Stack(
+        children: [
+          _screens[_selectedIndex], // Main content
+          // Floating Navigation Bar
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 20,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: List.generate(
+                      _navIcons.length,
+                      (index) => GestureDetector(
+                        onTap: () => _onItemTapped(index),
+                        child: AnimatedContainer(
+                          duration: Duration(milliseconds: 300),
+                          padding: EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: _selectedIndex == index
+                                ? LinearGradient(
+                                    colors: [Color(0xFF00FFA3), Color(0xFF00E676)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _navIcons[index],
+                                color: _selectedIndex == index ? Colors.black : Colors.white.withOpacity(0.7),
+                                size: 24,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                _navLabels[index],
+                                style: TextStyle(
+                                  color: _selectedIndex == index ? Colors.black : Colors.white.withOpacity(0.7),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

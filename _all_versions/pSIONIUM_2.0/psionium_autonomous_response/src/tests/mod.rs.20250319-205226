@@ -1,0 +1,69 @@
+use crate::ipc::IpcChannel;
+use ed25519_dalek::{SigningKey, Signer};
+use std::sync::Arc;
+use tokio::net::UnixListener;
+use tokio::task;
+use tokio::time::{sleep, Duration};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn test_ipc_send_receive() {
+        // Initialize logger (optional, remove if not needed)
+        env_logger::init();
+
+        // Generate cryptographic keys
+        let mut rng = rand::thread_rng();
+        let mut secret = [0u8; 32];
+        rng.fill_bytes(&mut secret);
+        let signing_key = SigningKey::from_bytes(&secret);
+        let verifying_key = signing_key.verifying_key();
+
+        // Create IpcChannel instance
+        let ipc = Arc::new(IpcChannel::new(verifying_key));
+
+        // Test data
+        let data = b"test data";
+        let signature = signing_key.sign(data);
+
+        // Set up socket path
+        let socket_path = "/tmp/psionium_ipc.sock";
+        if std::fs::metadata(socket_path).is_ok() {
+            std::fs::remove_file(socket_path).expect("Failed to clean up existing socket");
+        }
+        let listener = UnixListener::bind(socket_path).expect("Failed to bind to socket");
+
+        // Spawn a listener task to handle incoming connections
+        let listener_task = task::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("Failed to accept connection");
+            let mut buffer = vec![0u8; 1024];
+            let n = stream.read(&mut buffer).await.expect("Failed to read from stream");
+            buffer.truncate(n);
+
+            // Echo the data back (adjust based on your IPC requirements)
+            stream.write_all(&buffer).await.expect("Failed to write back to stream");
+            stream.flush().await.expect("Failed to flush stream");
+        });
+
+        // Wait briefly for the listener to start
+        sleep(Duration::from_millis(10)).await;
+
+        // Send data via IPC
+        let send_result = ipc.send_response(data, &signature.to_bytes()).await;
+        assert!(send_result.is_ok(), "Failed to send data via IPC");
+
+        // Receive the response (if your implementation supports it)
+        let received_data = ipc.receive_response().await;
+        assert!(received_data.is_ok(), "Failed to receive data via IPC");
+        assert_eq!(received_data.unwrap(), data, "Received data does not match sent data");
+
+        // Clean up
+        listener_task.abort();
+        if std::fs::metadata(socket_path).is_ok() {
+            std::fs::remove_file(socket_path).expect("Failed to remove socket file");
+        }
+    }
+}

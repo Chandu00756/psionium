@@ -1,0 +1,51 @@
+from oqs import KeyEncapsulation
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+import os
+
+class EncryptionModule:
+    def __init__(self):
+        self.supported_algorithms = {
+            "Kyber": "Kyber512",
+        }
+
+    def encrypt(self, data, algorithm):
+        if algorithm == "Kyber":
+            return self._encrypt_kyber(data)
+        else:
+            raise ValueError(f"Unsupported algorithm: {algorithm}")
+
+    def decrypt(self, encrypted_package, algorithm):
+        if algorithm == "Kyber":
+            return self._decrypt_kyber(encrypted_package)
+        else:
+            raise ValueError(f"Unsupported algorithm: {algorithm}")
+
+    def _encrypt_kyber(self, data):
+        kem = KeyEncapsulation(self.supported_algorithms["Kyber"])
+        public_key = kem.generate_keypair()
+        ciphertext, shared_secret = kem.encap_secret(public_key)
+
+        iv = os.urandom(16)
+        cipher = Cipher(algorithms.AES(shared_secret), modes.CFB(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        encrypted_data = encryptor.update(data) + encryptor.finalize()
+
+        return {
+            "ciphertext": ciphertext,
+            "encrypted_data": encrypted_data,
+            "iv": iv,
+            "public_key": public_key,
+            "private_key": kem.export_secret_key(),
+        }
+
+    def _decrypt_kyber(self, encrypted_package):
+        kem = KeyEncapsulation(self.supported_algorithms["Kyber"])
+        kem.import_secret_key(encrypted_package["private_key"])
+        shared_secret = kem.decap_secret(encrypted_package["ciphertext"])
+
+        cipher = Cipher(algorithms.AES(shared_secret), modes.CFB(encrypted_package["iv"]), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_data = decryptor.update(encrypted_package["encrypted_data"]) + decryptor.finalize()
+
+        return decrypted_data

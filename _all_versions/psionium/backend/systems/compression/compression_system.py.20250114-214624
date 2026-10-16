@@ -1,0 +1,89 @@
+import numpy as np
+import time
+from threading import Thread, Lock
+from queue import Queue
+
+class CompressionSystem:
+    def __init__(self):
+        self.qiac_module = QIACModule()
+        self.compression_queue = Queue()
+        self.decompression_queue = Queue()
+        self.results = {}
+        self.lock = Lock()
+        self.running = True
+
+    def add_compression_task(self, data, task_id):
+        self.compression_queue.put((data, task_id))
+
+    def add_decompression_task(self, compressed_data, task_id):
+        self.decompression_queue.put((compressed_data, task_id))
+
+    def process_compression_queue(self):
+        while self.running:
+            try:
+                data, task_id = self.compression_queue.get(timeout=1)
+                compressed = self.qiac_module.compress(data)
+                with self.lock:
+                    self.results[task_id] = compressed
+                self.compression_queue.task_done()
+            except Queue.Empty:
+                pass
+
+    def process_decompression_queue(self):
+        while self.running:
+            try:
+                compressed_data, task_id = self.decompression_queue.get(timeout=1)
+                decompressed = self.qiac_module.decompress(compressed_data)
+                with self.lock:
+                    self.results[task_id] = decompressed
+                self.decompression_queue.task_done()
+            except Queue.Empty:
+                pass
+
+    def get_result(self, task_id):
+        with self.lock:
+            return self.results.pop(task_id, None)
+
+    def run(self):
+        compression_thread = Thread(target=self.process_compression_queue)
+        decompression_thread = Thread(target=self.process_decompression_queue)
+        
+        compression_thread.start()
+        decompression_thread.start()
+
+        try:
+            while True:
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            self.running = False
+            compression_thread.join()
+            decompression_thread.join()
+
+    def stop(self):
+        self.running = False
+
+# Usage example
+if __name__ == "__main__":
+    compression_system = CompressionSystem()
+    
+    # Start the compression system in a separate thread
+    system_thread = Thread(target=compression_system.run)
+    system_thread.start()
+
+    try:
+        # Simulate adding compression and decompression tasks
+        sample_data = np.random.randint(0, 256, size=(1000,))
+        compression_system.add_compression_task(sample_data, "task1")
+
+        # Wait for the result
+        while True:
+            result = compression_system.get_result("task1")
+            if result is not None:
+                print("Compression result for task1:", result)
+                break
+            time.sleep(0.1)
+
+    finally:
+        # Stop the compression system
+        compression_system.stop()
+        system_thread.join()

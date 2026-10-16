@@ -1,0 +1,185 @@
+import 'package:flutter/material.dart';
+import 'package:page_transition/page_transition.dart';
+import 'dart:ui'; // For ImageFilter
+import 'screens/home_screen.dart';
+import 'screens/file_management_screen.dart';
+import 'screens/encrypt_decrypt.dart';
+import 'screens/key_management_screen.dart';
+import 'screens/threat_management_screen.dart';
+import 'screens/workflow_automation_screen.dart';
+import 'screens/billing_screen.dart';
+import 'screens/security_settings_screen.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'pSIONIUM Dock',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFF00FFA3), // Modern teal accent
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: MainNavigationScreen(),
+    );
+  }
+}
+
+class MainNavigationScreen extends StatefulWidget {
+  @override
+  _MainNavigationScreenState createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  int _selectedIndex = 0;
+  bool _isSidebarCollapsed = false;
+
+  // List of screens
+  final List<Widget> _screens = [
+    HomeScreen(),
+    FileManagementScreen(),
+    EncryptionScreen(),
+    KeyManagementScreen(),
+    ThreatManagementScreen(),
+    WorkflowAutomationScreen(),
+    BillingScreen(),
+    SecuritySettingsScreen(),
+  ];
+
+  // Unique icons for the navigation bar
+  final List<IconData> _navIcons = [
+    Icons.home,
+    Icons.folder,
+    Icons.lock,
+    Icons.vpn_key,
+    Icons.security,
+    Icons.work,
+    Icons.credit_card,
+    Icons.settings,
+  ];
+
+  // Labels for the navigation bar
+  final List<String> _navLabels = [
+    "Home",
+    "Files",
+    "Encrypt",
+    "Keys",
+    "Threats",
+    "Workflow",
+    "Billing",
+    "Settings",
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  void _toggleSidebar() {
+    setState(() {
+      _isSidebarCollapsed = !_isSidebarCollapsed;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Color(0xFF0A0E21), // Dark background
+      body: Row(
+        children: [
+          // Sidebar Navigation
+          AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            width: _isSidebarCollapsed ? 80 : 200,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              border: Border(
+                right: BorderSide(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                SizedBox(height: 20),
+                // Branding and Version
+                _isSidebarCollapsed
+                    ? Icon(Icons.lock, color: Color(0xFF00FFA3), size: 30)
+                    : Column(
+                        children: [
+                          Text(
+                            "pSIONIUM",
+                            style: TextStyle(
+                              color: Color(0xFF00FFA3),
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            "Version 1.0.0",
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                SizedBox(height: 20),
+                // Navigation Items
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _navIcons.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        leading: Icon(
+                          _navIcons[index],
+                          color: _selectedIndex == index ? Color(0xFF00FFA3) : Colors.white.withOpacity(0.7),
+                        ),
+                        title: _isSidebarCollapsed
+                            ? null
+                            : Text(
+                                _navLabels[index],
+                                style: TextStyle(
+                                  color: _selectedIndex == index ? Color(0xFF00FFA3) : Colors.white.withOpacity(0.7),
+                                ),
+                              ),
+                        onTap: () => _onItemTapped(index),
+                      );
+                    },
+                  ),
+                ),
+                // Collapse Button
+                ListTile(
+                  leading: Icon(
+                    _isSidebarCollapsed ? Icons.chevron_right : Icons.chevron_left,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                  title: _isSidebarCollapsed
+                      ? null
+                      : Text(
+                          "Collapse",
+                          style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                        ),
+                  onTap: _toggleSidebar,
+                ),
+              ],
+            ),
+          ),
+          // Main Content
+          Expanded(
+            child: _screens[_selectedIndex],
+          ),
+        ],
+      ),
+    );
+  }
+}

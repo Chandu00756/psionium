@@ -1,0 +1,26 @@
+[package]
+name = "psionium_ui"
+version = "0.1.0"
+edition = "2021"
+description = "Ultra-advanced UI for Project Psionium cybersecurity suite"
+license = "MIT"
+
+[dependencies]
+psionium_autonomous_response = { path = "../psionium_autonomous_response" }
+psionium_ai_threat_detection = { path = "../psionium_ai_threat_detection" }
+psionium_crypto_engine = { path = "../psionium_crypto_engine" }
+psionium_network_resilience = { path = "../psionium_network_resilience" }
+tokio = { version = "1.40", features = ["full"] }
+warp = "0.3" # Web server framework
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.11"
+argon2 = "0.5" # For passphrase hashing
+anyhow = "1.0"
+tokio-tungstenite = "0.23" # For WebSocket updates
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

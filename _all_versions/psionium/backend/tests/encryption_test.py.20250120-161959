@@ -1,0 +1,62 @@
+import sys
+import os
+import base64
+
+# Add the project root directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'modules'))
+
+# Import the EncryptionModule
+from encryptionmodule.encryption_module import EncryptionModule
+
+import unittest
+
+
+class TestEncryptionModule(unittest.TestCase):
+    def setUp(self):
+        self.encryption_module = EncryptionModule()
+        self.test_data = b"Hello, World! This is a test message."
+
+    def test_supported_algorithms(self):
+        algorithms = self.encryption_module.list_supported_algorithms()
+        self.assertIsInstance(algorithms, list)
+        self.assertTrue(len(algorithms) > 0)
+
+    def test_kyber_encryption_decryption(self):
+        encrypted = self.encryption_module.encrypt(self.test_data, "Kyber")
+        decrypted = self.encryption_module.decrypt(encrypted, "Kyber")
+        self.assertEqual(self.test_data, decrypted)
+
+    def test_dilithium_signature(self):
+        signature = self.encryption_module.encrypt(self.test_data, "Dilithium")
+        self.assertIsNotNone(signature)
+
+    def test_falcon_signature(self):
+        signature = self.encryption_module.encrypt(self.test_data, "Falcon")
+        self.assertIsNotNone(signature)
+
+    def test_ntru_encryption(self):
+        encrypted = self.encryption_module.encrypt(self.test_data, "NTRU")
+        self.assertIsNotNone(encrypted)
+
+    def test_sphincs_signature(self):
+        signature = self.encryption_module.encrypt(self.test_data, "SPHINCS+")
+        self.assertIsNotNone(signature)
+
+    def test_aes_encryption_decryption(self):
+        key = b"0" * 32  # 256-bit key
+        encrypted = self.encryption_module.encrypt(self.test_data, "AES-256", key)
+        decrypted = self.encryption_module.decrypt(encrypted, "AES-256", key)
+        self.assertEqual(self.test_data, decrypted)
+
+    def test_chacha20_encryption_decryption(self):
+        key = b"0" * 32  # 256-bit key
+        encrypted = self.encryption_module.encrypt(self.test_data, "ChaCha20", key)
+        decrypted = self.encryption_module.decrypt(encrypted, "ChaCha20", key)
+        self.assertEqual(self.test_data, decrypted)
+
+    def test_unsupported_algorithm(self):
+        with self.assertRaises(ValueError):
+            self.encryption_module.encrypt(self.test_data, "UnsupportedAlgorithm")
+
+if __name__ == "__main__":
+    unittest.main()

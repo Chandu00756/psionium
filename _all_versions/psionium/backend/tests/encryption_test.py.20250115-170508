@@ -1,0 +1,36 @@
+import sys
+import os
+import base64
+import time
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+
+# Add the project root directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'modules'))
+
+# Import the EncryptionModule
+from encryptionmodule.encryption_module import EncryptionModule
+
+# Initialize the Encryption Module
+encryption_module = EncryptionModule()
+
+# Test data
+data = b"Hello, Psionium!"
+
+# Test Kyber
+def test_kyber():
+    print("\nTesting Kyber...")
+    try:
+        # Encrypt
+        encrypted_package = encryption_module.encrypt(data, "Kyber")
+        # Decrypt
+        decrypted_data = encryption_module.decrypt(encrypted_package, "Kyber")
+        assert decrypted_data == data, "Kyber decryption failed"
+        print("Kyber Decrypted Data (base64):", base64.b64encode(decrypted_data).decode('utf-8'))
+    except Exception as e:
+        print("Kyber test failed:", e)
+        raise
+
+# Run the Kyber test
+if __name__ == "__main__":
+    test_kyber()

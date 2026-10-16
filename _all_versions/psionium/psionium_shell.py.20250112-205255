@@ -1,0 +1,70 @@
+import argparse
+from systems.encoding_system import EncodingSystem
+
+def encode_file(file_path, encoding_type="dynamic"):
+    """
+    Encode a file using the specified encoding type.
+    :param file_path: Path to the input file.
+    :param encoding_type: Encoding type (dynamic, base64, hex).
+    """
+    try:
+        with open(file_path, 'rb') as file:
+            data = file.read()
+
+        encoder = EncodingSystem(encoding_type=encoding_type)
+        encoded_data = encoder.process(data)
+
+        output_path = file_path + ".encoded"
+        with open(output_path, 'w') as output_file:
+            output_file.write(encoded_data)
+
+        print(f"File encoded successfully: {output_path}")
+    except Exception as e:
+        print(f"Error during encoding: {e}")
+
+def decode_file(file_path, encoding_type="dynamic"):
+    """
+    Decode a file using the specified encoding type.
+    :param file_path: Path to the input file.
+    :param encoding_type: Encoding type (dynamic, base64, hex).
+    """
+    try:
+        with open(file_path, 'r') as file:
+            encoded_data = file.read()
+
+        encoder = EncodingSystem(encoding_type=encoding_type)
+        decoded_data = encoder.reverse_process(encoded_data)
+
+        output_path = file_path.replace(".encoded", ".decoded")
+        with open(output_path, 'wb') as output_file:
+            output_file.write(decoded_data)
+
+        print(f"File decoded successfully: {output_path}")
+    except Exception as e:
+        print(f"Error during decoding: {e}")
+
+def main():
+    parser = argparse.ArgumentParser(description="pSIONIUM Unified Shell")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Encode command
+    encode_parser = subparsers.add_parser("encode", help="Encode a file")
+    encode_parser.add_argument("file", help="Path to the input file")
+    encode_parser.add_argument("--type", help="Encoding type (dynamic, base64, hex)", default="dynamic")
+
+    # Decode command
+    decode_parser = subparsers.add_parser("decode", help="Decode a file")
+    decode_parser.add_argument("file", help="Path to the input file")
+    decode_parser.add_argument("--type", help="Encoding type (dynamic, base64, hex)", default="dynamic")
+
+    args = parser.parse_args()
+
+    if args.command == "encode":
+        encode_file(args.file, args.type)
+    elif args.command == "decode":
+        decode_file(args.file, args.type)
+    else:
+        parser.print_help()
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,105 @@
+use super::detector::{ThreatDetector, Monitor, LoggerAlertHandler, AlertSeverity, ModelUpdate, AlertHandler};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signer};
+use log::info;
+use std::sync::Once;
+use std::fs;
+use std::path::Path;
+use std::time::Duration;
+use tokio::time::sleep;
+
+static INIT_LOGGER: Once = Once::new();
+
+fn init_logger() {
+    INIT_LOGGER.call_once(|| {
+        env_logger::init();
+    });
+}
+
+#[test]
+fn test_threat_detection() {
+    init_logger();
+    let verifying_key = VerifyingKey::from_bytes(&[0u8; 32]).expect("Invalid verifying key");
+    let detector = ThreatDetector::new(verifying_key);
+
+    let normal_features = vec![1.0, 2.0, 1.0];
+    let is_threat = detector.detect(&normal_features).expect("Detection failed");
+    assert!(!is_threat, "Normal behavior should not be flagged as a threat");
+    info!("Normal behavior test passed");
+
+    let threat_features = vec![15.0, 30.0, 7.0];
+    let is_threat = detector.detect(&threat_features).expect("Detection failed");
+    assert!(is_threat, "Threat behavior should be flagged");
+    info!("Threat detection test passed");
+}
+
+#[test]
+fn test_invalid_features() {
+    init_logger();
+    let verifying_key = VerifyingKey::from_bytes(&[0u8; 32]).expect("Invalid verifying key");
+    let detector = ThreatDetector::new(verifying_key);
+
+    let invalid_features = vec![1.0, 2.0];
+    let result = detector.detect(&invalid_features);
+    assert!(result.is_err(), "Invalid feature count should fail");
+    info!("Invalid features test passed");
+}
+
+#[test]
+fn test_model_update() {
+    init_logger();
+    let mut rng = rand::thread_rng();
+    let mut secret = [0u8; 32];
+    rng.fill_bytes(&mut secret);
+    let signing_key = SigningKey::from_bytes(&secret);
+    let verifying_key = signing_key.verifying_key();
+    let mut detector = ThreatDetector::new(verifying_key);
+
+    let model_update = ModelUpdate {
+        x: vec![vec![1.0, 2.0, 1.0], vec![10.0, 20.0, 5.0]],
+        y: vec![0, 1],
+    };
+    let serialized_update = bincode::serialize(&model_update).expect("Serialization failed");
+    let signature = signing_key.sign(&serialized_update);
+
+    let result = detector.update_model(serialized_update.clone(), signature.to_bytes().to_vec());
+    assert!(result.is_ok(), "Model update should succeed with valid signature");
+    info!("Model update test passed");
+
+    let invalid_signature = vec![0u8; 64];
+    let result = detector.update_model(serialized_update, invalid_signature);
+    assert!(result.is_err(), "Model update should fail with invalid signature");
+    info!("Invalid signature test passed");
+}
+
+#[tokio::test]
+async fn test_real_time_monitoring() {
+    init_logger();
+    let verifying_key = VerifyingKey::from_bytes(&[0u8; 32]).expect("Invalid verifying key");
+    let detector = ThreatDetector::new(verifying_key);
+    let alert_handler = Box::new(LoggerAlertHandler);
+    let test_dir = "/tmp/test_monitor";
+    fs::create_dir_all(test_dir).expect("Failed to create test directory");
+
+    let mut monitor = Monitor::new(detector, alert_handler, test_dir).expect("Failed to initialize monitor");
+
+    for i in 0..5 {
+        let file_path = Path::new(test_dir).join(format!("file_{}.txt", i));
+        fs::write(&file_path, "test content").expect("Failed to write file");
+        fs::remove_file(&file_path).expect("Failed to remove file");
+    }
+
+    let monitor_task = tokio::task::spawn(async move {
+        monitor.run().await.expect("Monitor failed");
+    });
+    sleep(Duration::from_secs(2)).await;
+    monitor_task.abort();
+    info!("Real-time monitoring test completed");
+}
+
+#[test]
+fn test_alert_handling() {
+    init_logger();
+    let alert_handler = LoggerAlertHandler;
+    alert_handler.handle_alert("Test alert", AlertSeverity::High);
+    info!("Alert handling test completed");
+}

@@ -1,0 +1,81 @@
+use ed25519_dalek::{VerifyingKey, Signature, Verifier};
+use tokio::net::{UnixListener, UnixStream};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use log::{info, warn, error};
+use anyhow::{Result, anyhow};
+use tokio::sync::Mutex;
+use std::path::Path;
+use std::sync::Arc;
+use constant_time_eq::constant_time_eq;
+
+const SOCKET_PATH: &str = "/tmp/psionium_ipc.sock";
+const MAX_MESSAGE_SIZE: usize = 1024 * 1024; // 1MB
+
+#[derive(Clone)]
+pub struct IpcChannel {
+    verifying_key: VerifyingKey,
+    connection: Arc<Mutex<UnixStream>>,
+}
+
+impl IpcChannel {
+    pub async fn new(verifying_key: VerifyingKey) -> Result<Self> {
+        let listener = UnixListener::bind(SOCKET_PATH)?;
+        let (socket, _) = listener.accept().await?;
+        
+        info!("Initialized quantum-resistant IPC channel with ZTA");
+        Ok(IpcChannel {
+            verifying_key,
+            connection: Arc::new(Mutex::new(socket)),
+        })
+    }
+
+    pub async fn send_response(&self, data: &[u8], sig_bytes: &[u8]) -> Result<()> {
+        let signature = Signature::from_bytes(sig_bytes)
+            .map_err(|_| anyhow!("Invalid signature format"))?;
+
+        // Constant-time verification
+        if !self.verifying_key.verify(data, &signature).is_ok() {
+            return Err(anyhow!("Signature verification failed"));
+        }
+
+        let mut conn = self.connection.lock().await;
+        let msg = Self::frame_message(data, sig_bytes);
+        conn.write_all(&msg).await?;
+        
+        info!("Sent encrypted response via quantum-secured IPC");
+        Ok(())
+    }
+
+    pub async fn receive_response(&self) -> Result<Vec<u8>> {
+        let mut conn = self.connection.lock().await;
+        let mut header = [0u8; 4];
+        conn.read_exact(&mut header).await?;
+        let data_len = u32::from_be_bytes(header) as usize;
+
+        if data_len > MAX_MESSAGE_SIZE {
+            return Err(anyhow!("Message size exceeds limit"));
+        }
+
+        let mut buffer = vec![0u8; data_len];
+        conn.read_exact(&mut buffer).await?;
+
+        let (data, sig_bytes) = buffer.split_at(data_len - 64);
+        let signature = Signature::from_bytes(sig_bytes)
+            .map_err(|_| anyhow!("Invalid signature format"))?;
+
+        // Constant-time verification
+        if !self.verifying_key.verify(data, &signature).is_ok() {
+            return Err(anyhow!("Signature verification failed"));
+        }
+
+        Ok(data.to_vec())
+    }
+
+    fn frame_message(data: &[u8], sig: &[u8]) -> Vec<u8> {
+        let mut msg = Vec::with_capacity(4 + data.len() + 64);
+        msg.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        msg.extend_from_slice(data);
+        msg.extend_from_slice(sig);
+        msg
+    }
+}

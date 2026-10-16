@@ -1,0 +1,90 @@
+import os
+import json
+import hashlib
+import time
+from typing import Dict, Any
+from dkey import UltraSecureDeviceIdentifier
+
+class DIBLE:
+    def __init__(self):
+        self.device_id_generator = UltraSecureDeviceIdentifier()
+
+    def generate_dynamic_private_key(self) -> bytes:
+        """
+        Generates a dynamic private key using the UltraSecureDeviceIdentifier.
+        """
+        return self.device_id_generator.generate_device_key()
+
+    def hash_key(self, key: bytes) -> bytes:
+        """
+        Hashes the key using SHA3-256 for additional security.
+        """
+        return hashlib.sha3_256(key).digest()
+
+    def construct_lattice(self, hashed_key: bytes) -> Dict[str, Any]:
+        """
+        Constructs a high-dimensional lattice using the hashed key.
+        This is a placeholder for the actual lattice construction logic.
+        """
+        lattice = {
+            "basis": hashed_key.hex(),  # Use the hashed key as the lattice basis
+            "dimensions": len(hashed_key),  # Number of dimensions = length of the key
+            "timestamp": int(time.time()),  # Add a timestamp for uniqueness
+        }
+        return lattice
+
+    def lock_file(self, encrypted_data: bytes, receiver_public_key: bytes, original_file_name: str) -> str:
+        """
+        Locks the encrypted data with the receiver's public key and creates a `.psen` file.
+        """
+        # Generate a dynamic private key for the receiver
+        dynamic_private_key = self.generate_dynamic_private_key()
+
+        # Hash the dynamic private key
+        hashed_key = self.hash_key(dynamic_private_key)
+
+        # Construct the high-dimensional lattice
+        lattice = self.construct_lattice(hashed_key)
+
+        # Combine encrypted data, lattice, and receiver public key
+        locked_data = {
+            "encrypted_data": encrypted_data.hex(),
+            "lattice": lattice,
+            "receiver_public_key": receiver_public_key.hex(),
+        }
+
+        # Convert to JSON and encode as bytes
+        locked_data_bytes = json.dumps(locked_data).encode()
+
+        # Create the custom file name (e.g., sample.pdf → sample.pdf.psen)
+        custom_file_name = f"{original_file_name}.psen"
+
+        # Write the locked data to the file
+        with open(custom_file_name, "wb") as file:
+            file.write(locked_data_bytes)
+
+        return custom_file_name
+
+    def unlock_file(self, custom_file_name: str, dynamic_private_key: bytes) -> bytes:
+        """
+        Unlocks the `.psen` file using the receiver's dynamic private key and extracts the encrypted data.
+        """
+        # Read the locked data from the file
+        with open(custom_file_name, "rb") as file:
+            locked_data_bytes = file.read()
+
+        # Decode the JSON data
+        locked_data = json.loads(locked_data_bytes.decode())
+
+        # Hash the dynamic private key
+        hashed_key = self.hash_key(dynamic_private_key)
+
+        # Verify the dynamic private key by reconstructing the lattice
+        reconstructed_lattice = self.construct_lattice(hashed_key)
+        if reconstructed_lattice != locked_data["lattice"]:
+            raise ValueError("Invalid dynamic private key. File cannot be unlocked.")
+
+        # Extract the encrypted data
+        encrypted_data = bytes.fromhex(locked_data["encrypted_data"])
+
+        return encrypted_data

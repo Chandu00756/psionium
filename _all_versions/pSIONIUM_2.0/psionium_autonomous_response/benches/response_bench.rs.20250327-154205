@@ -1,0 +1,33 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use psionium_autonomous_response::response::ResponseEngine;
+use psionium_crypto_engine::crypto::PsioniumCrypto;
+use psionium_ai_threat_detection::detector::ThreatDetector;
+use ed25519_dalek::SigningKey;
+use rand::RngCore;
+
+fn bench_response(c: &mut Criterion) {
+    let mut rng = rand::thread_rng();
+    let mut secret = [0u8; 32];
+    rng.fill_bytes(&mut secret);
+    let signing_key = SigningKey::from_bytes(&secret);
+    
+    let crypto = PsioniumCrypto::new().expect("Crypto init failed");
+    let detector = ThreatDetector::new(signing_key.verifying_key());
+    
+    // Create a Tokio runtime once
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    // Await the future from ResponseEngine::new to get the instance
+    let engine = rt.block_on(ResponseEngine::new(crypto, detector, signing_key));
+    
+    let features = vec![15.0, 30.0, 7.0]; // Threat scenario
+    c.bench_function("handle_threat", |b| {
+        b.iter(|| {
+            // Use the existing runtime to run the future returned by handle_threat
+            rt.block_on(engine.handle_threat(black_box(1234), black_box(&features)))
+                .unwrap();
+        })
+    });
+}
+
+criterion_group!(benches, bench_response);
+criterion_main!(benches);

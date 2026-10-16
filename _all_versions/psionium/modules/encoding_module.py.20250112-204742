@@ -1,0 +1,39 @@
+from modules.encoding_module import EncodingModule
+from systems.dynamic_encoding_system import DynamicEncodingSystem
+
+class EncodingSystem:
+    def __init__(self, encoding_type="dynamic"):
+        self.encoding_type = encoding_type
+        self.regular_encoder = EncodingModule()
+        self.dynamic_encoder = DynamicEncodingSystem()
+
+    def process(self, data):
+        """
+        Process the input data by encoding it.
+        :param data: Raw data (bytes or string).
+        :return: Encoded data (string).
+        """
+        try:
+            if self.encoding_type == "dynamic":
+                return self.dynamic_encoder.process(data)
+            else:
+                return self.regular_encoder.encode(data)
+        except Exception as e:
+            print(f"Dynamic encoding failed. Falling back to regular encoding: {e}")
+            return self.regular_encoder.encode(data)
+
+    def reverse_process(self, encoded_data, dimensions=None):
+        """
+        Reverse the encoding process.
+        :param encoded_data: Encoded data (string).
+        :param dimensions: Selected dimensions (list) for dynamic decoding.
+        :return: Decoded data (bytes).
+        """
+        try:
+            if self.encoding_type == "dynamic" and dimensions:
+                return self.dynamic_encoder.reverse_process(encoded_data, dimensions)
+            else:
+                return self.regular_encoder.decode(encoded_data)
+        except Exception as e:
+            print(f"Dynamic decoding failed. Falling back to regular decoding: {e}")
+            return self.regular_encoder.decode(encoded_data)

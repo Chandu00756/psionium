@@ -1,0 +1,192 @@
+import 'package:flutter/material.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+
+class KeyManagementScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text(
+          "Key Management",
+          style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.black,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.search, color: Colors.green),
+            onPressed: () {
+              // Open global search
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Key Generation Section
+              _buildKeyGenerationSection(context),
+              SizedBox(height: 20),
+
+              // Key Storage Section
+              _buildKeyStorageSection(context),
+              SizedBox(height: 20),
+
+              // Key Sharing Section
+              _buildKeySharingSection(context),
+              SizedBox(height: 20),
+
+              // Key Rotation Section
+              _buildKeyRotationSection(context),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Open quick actions menu
+        },
+        child: Icon(Icons.add, color: Colors.black),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Widget _buildKeyGenerationSection(BuildContext context) {
+    return Card(
+      color: Colors.grey[900],
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Key Generation",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Generate key
+              },
+              icon: Icon(Icons.vpn_key, color: Colors.black),
+              label: Text("Generate Key", style: TextStyle(color: Colors.black)),
+              style: ElevatedButton.styleFrom(
+                primary: Colors.green,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKeyStorageSection(BuildContext context) {
+    return Card(
+      color: Colors.grey[900],
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Key Storage",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            ListTile(
+              leading: Icon(Icons.vpn_key, color: Colors.green),
+              title: Text("Key 1", style: TextStyle(color: Colors.white)),
+              subtitle: Text("Created: 2023-10-01", style: TextStyle(color: Colors.grey)),
+              trailing: IconButton(
+                icon: Icon(Icons.more_vert, color: Colors.white),
+                onPressed: () {
+                  // Show key details
+                },
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.vpn_key, color: Colors.green),
+              title: Text("Key 2", style: TextStyle(color: Colors.white)),
+              subtitle: Text("Created: 2023-10-05", style: TextStyle(color: Colors.grey)),
+              trailing: IconButton(
+                icon: Icon(Icons.more_vert, color: Colors.white),
+                onPressed: () {
+                  // Show key details
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKeySharingSection(BuildContext context) {
+    return Card(
+      color: Colors.grey[900],
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Key Sharing",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            ListTile(
+              leading: Icon(Icons.share, color: Colors.green),
+              title: Text("Share Key", style: TextStyle(color: Colors.white)),
+              subtitle: Text("Share keys securely with authorized users", style: TextStyle(color: Colors.grey)),
+              trailing: IconButton(
+                icon: Icon(Icons.arrow_forward, color: Colors.white),
+                onPressed: () {
+                  // Share key
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKeyRotationSection(BuildContext context) {
+    return Card(
+      color: Colors.grey[900],
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Key Rotation",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            SizedBox(height: 10),
+            ListTile(
+              leading: Icon(Icons.autorenew, color: Colors.green),
+              title: Text("Rotate Key", style: TextStyle(color: Colors.white)),
+              subtitle: Text("Automatically or manually rotate keys for enhanced security", style: TextStyle(color: Colors.grey)),
+              trailing: IconButton(
+                icon: Icon(Icons.arrow_forward, color: Colors.white),
+                onPressed: () {
+                  // Rotate key
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
