@@ -10,7 +10,7 @@ fn psion() -> Command {
 
 fn keygen(dir: &Path, name: &str, suite: &str) -> String {
     let out = psion()
-        .args(["keygen", "--suite", suite, "-o"])
+        .args(["keygen", "--no-passphrase", "--suite", suite, "-o"])
         .arg(dir.join(name))
         .assert()
         .success()
@@ -96,10 +96,37 @@ fn stdin_to_stdout_with_a_recipients_file() {
     psion()
         .args(["decrypt", "-i"])
         .arg(dir.path().join("me.key"))
-        .write_stdin(sealed)
+        .write_stdin(sealed.clone())
         .assert()
         .success()
         .stdout("piped secret");
+
+    // "-" names standard input and output explicitly, and never creates a file called "-".
+    fs::write(dir.path().join("sealed.psen"), &sealed).unwrap();
+    psion()
+        .current_dir(dir.path())
+        .args(["decrypt", "-i", "me.key", "-o", "-", "sealed.psen"])
+        .assert()
+        .success()
+        .stdout("piped secret");
+    assert!(!dir.path().join("sealed").exists());
+    let resealed = psion()
+        .current_dir(dir.path())
+        .args(["encrypt", "-R", "team.txt", "-o", "-", "-"])
+        .write_stdin("dash secret")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    psion()
+        .current_dir(dir.path())
+        .args(["decrypt", "-i", "me.key", "-"])
+        .write_stdin(resealed)
+        .assert()
+        .success()
+        .stdout("dash secret");
+    assert!(!dir.path().join("-").exists());
 }
 
 #[test]
@@ -166,7 +193,7 @@ fn wrong_identity_and_existing_outputs_are_refused() {
         .failure()
         .stderr(predicate::str::contains("not a recipient"));
     psion()
-        .args(["keygen", "-o"])
+        .args(["keygen", "--no-passphrase", "-o"])
         .arg(dir.path().join("a.key"))
         .assert()
         .failure()
@@ -177,4 +204,283 @@ fn wrong_identity_and_existing_outputs_are_refused() {
         .arg("--force")
         .assert()
         .failure();
+}
+
+fn verify_key(dir: &Path, name: &str) -> String {
+    let out = psion()
+        .args(["pubkey", "--verify-key", "-i"])
+        .arg(dir.join(name))
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    String::from_utf8(out).unwrap().trim().to_string()
+}
+
+#[test]
+fn signed_files_are_checked_against_expected_senders() {
+    let dir = tempfile::tempdir().unwrap();
+    keygen(dir.path(), "alice.key", "pq-hybrid-768");
+    let bob = keygen(dir.path(), "bob.key", "pq-hybrid-768");
+    keygen(dir.path(), "mallory.key", "pq-hybrid-768");
+    let alice_vk = verify_key(dir.path(), "alice.key");
+    let mallory_vk = verify_key(dir.path(), "mallory.key");
+    assert!(alice_vk.starts_with("psionvk:"));
+
+    let plain = dir.path().join("contract.txt");
+    fs::write(&plain, b"signed terms").unwrap();
+    psion()
+        .args(["encrypt", "-r", &bob, "--sign-with"])
+        .arg(dir.path().join("alice.key"))
+        .arg(&plain)
+        .assert()
+        .success();
+    let sealed = dir.path().join("contract.txt.psen");
+    psion()
+        .arg("inspect")
+        .arg(&sealed)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("signed:      yes"));
+
+    // The right sender is accepted.
+    let ok = dir.path().join("ok.txt");
+    psion()
+        .args(["decrypt", "-i"])
+        .arg(dir.path().join("bob.key"))
+        .args(["--signed-by", &alice_vk, "-o"])
+        .arg(&ok)
+        .arg(&sealed)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "Signature: valid, from expected sender",
+        ));
+    assert_eq!(fs::read(&ok).unwrap(), b"signed terms");
+
+    // A different expected sender is refused and nothing is written.
+    let bad = dir.path().join("bad.txt");
+    psion()
+        .args(["decrypt", "-i"])
+        .arg(dir.path().join("bob.key"))
+        .args(["--signed-by", &mallory_vk, "-o"])
+        .arg(&bad)
+        .arg(&sealed)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not one of the expected senders"));
+    assert!(!bad.exists());
+
+    // An unsigned file is refused when a signature is required.
+    let unsigned = dir.path().join("unsigned.txt");
+    fs::write(&unsigned, b"x").unwrap();
+    psion()
+        .args(["encrypt", "-r", &bob])
+        .arg(&unsigned)
+        .assert()
+        .success();
+    psion()
+        .args(["decrypt", "-i"])
+        .arg(dir.path().join("bob.key"))
+        .args(["--signed-by", &alice_vk, "-o"])
+        .arg(dir.path().join("u.out"))
+        .arg(dir.path().join("unsigned.txt.psen"))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not signed"));
+}
+
+#[test]
+fn passphrase_protected_identities() {
+    let dir = tempfile::tempdir().unwrap();
+    let pass = dir.path().join("pass.txt");
+    fs::write(&pass, "correct horse battery\n").unwrap();
+    let key = dir.path().join("me.key");
+    let pk = String::from_utf8(
+        psion()
+            .args(["keygen", "-o"])
+            .arg(&key)
+            .arg("--passphrase-file")
+            .arg(&pass)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .unwrap()
+    .trim()
+    .to_string();
+    let contents = fs::read_to_string(&key).unwrap();
+    assert!(contents.contains("psionpe:") && !contents.contains("psionsk:"));
+
+    // The public key is readable without the passphrase.
+    psion()
+        .args(["pubkey", "-i"])
+        .arg(&key)
+        .assert()
+        .success()
+        .stdout(format!("{pk}\n"));
+
+    let plain = dir.path().join("a.txt");
+    fs::write(&plain, b"locked").unwrap();
+    psion()
+        .args(["encrypt", "-r", &pk])
+        .arg(&plain)
+        .assert()
+        .success();
+    fs::remove_file(&plain).unwrap();
+    let sealed = dir.path().join("a.txt.psen");
+
+    // Without a terminal and without --passphrase-file, decryption explains what to do.
+    psion()
+        .args(["decrypt", "-i"])
+        .arg(&key)
+        .arg(&sealed)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--passphrase-file"));
+
+    // A wrong passphrase is refused.
+    let wrong = dir.path().join("wrong.txt");
+    fs::write(&wrong, "not the passphrase\n").unwrap();
+    psion()
+        .args(["decrypt", "-i"])
+        .arg(&key)
+        .arg("--passphrase-file")
+        .arg(&wrong)
+        .arg(&sealed)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("wrong passphrase"));
+
+    psion()
+        .args(["decrypt", "-i"])
+        .arg(&key)
+        .arg("--passphrase-file")
+        .arg(&pass)
+        .arg(&sealed)
+        .assert()
+        .success();
+    assert_eq!(fs::read(&plain).unwrap(), b"locked");
+
+    // Change the passphrase, then remove it.
+    let new_pass = dir.path().join("new.txt");
+    fs::write(&new_pass, "a brand new passphrase\n").unwrap();
+    psion()
+        .args(["passphrase", "-i"])
+        .arg(&key)
+        .arg("--passphrase-file")
+        .arg(&pass)
+        .arg("--new-passphrase-file")
+        .arg(&new_pass)
+        .assert()
+        .success();
+    psion()
+        .args(["pubkey", "--verify-key", "-i"])
+        .arg(&key)
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("psionvk:"));
+    psion()
+        .args(["passphrase", "--remove", "-i"])
+        .arg(&key)
+        .arg("--passphrase-file")
+        .arg(&new_pass)
+        .assert()
+        .success();
+    assert!(fs::read_to_string(&key).unwrap().contains("psionsk:"));
+
+    // keygen without a terminal needs a passphrase source.
+    psion()
+        .args(["keygen", "-o"])
+        .arg(dir.path().join("x.key"))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--passphrase-file"));
+    let short = dir.path().join("short.txt");
+    fs::write(&short, "short\n").unwrap();
+    psion()
+        .args(["keygen", "-o"])
+        .arg(dir.path().join("y.key"))
+        .arg("--passphrase-file")
+        .arg(&short)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("at least 8"));
+}
+
+#[test]
+fn scan_reports_and_fails_on_request() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("src")).unwrap();
+    fs::write(
+        dir.path().join("src/keys.go"),
+        "k, _ := rsa.GenerateKey(rand.Reader, 2048)\n",
+    )
+    .unwrap();
+    fs::write(dir.path().join("src/pq.rs"), "let g = X25519MLKEM768;\n").unwrap();
+
+    let out = psion()
+        .arg("scan")
+        .arg(dir.path())
+        .args(["--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let findings = json["findings"].as_array().unwrap();
+    assert!(
+        findings
+            .iter()
+            .any(|f| f["algorithm"] == "RSA" && f["location"] == "src/keys.go" && f["line"] == 1)
+    );
+    assert!(findings.iter().any(|f| f["category"] == "quantum-safe"));
+
+    psion()
+        .arg("scan")
+        .arg(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Quantum-vulnerable"));
+    psion()
+        .arg("scan")
+        .arg(dir.path())
+        .args(["--fail-on", "quantum-vulnerable"])
+        .assert()
+        .code(2);
+    psion()
+        .arg("scan")
+        .arg(dir.path().join("src/pq.rs"))
+        .args(["--fail-on", "quantum-vulnerable"])
+        .assert()
+        .success();
+
+    let cbom = dir.path().join("cbom.json");
+    psion()
+        .arg("scan")
+        .arg(dir.path().join("src"))
+        .args(["--format", "cbom", "-o"])
+        .arg(&cbom)
+        .assert()
+        .success();
+    let bom: serde_json::Value = serde_json::from_str(&fs::read_to_string(&cbom).unwrap()).unwrap();
+    assert_eq!(bom["specVersion"], "1.6");
+
+    psion()
+        .arg("scan")
+        .arg(dir.path())
+        .args(["--format", "xml"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown --format"));
+    psion()
+        .arg("scan")
+        .arg(dir.path().join("missing"))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("does not exist"));
 }

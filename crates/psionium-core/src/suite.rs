@@ -1,16 +1,17 @@
 use std::fmt;
 
 use aws_lc_rs::kem;
+use aws_lc_rs::signature;
 
 use crate::error::{Error, Result};
 
 /// An algorithm suite. Every key pair and every file belongs to exactly one.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Suite {
-    /// X25519 + ML-KEM-768 hybrid, AES-256-GCM, HKDF-SHA-384. The default.
+    /// X25519 + ML-KEM-768 hybrid, ML-DSA-65 signatures, AES-256-GCM, HKDF-SHA-384. The default.
     #[default]
     PqHybrid768,
-    /// ML-KEM-1024, AES-256-GCM, HKDF-SHA-384: algorithms from NSA's CNSA 2.0.
+    /// ML-KEM-1024, ML-DSA-87 signatures, AES-256-GCM, HKDF-SHA-384: algorithms from NSA's CNSA 2.0.
     Cnsa1024,
 }
 
@@ -53,8 +54,8 @@ impl Suite {
     /// A one-line description of the suite's algorithms.
     pub const fn description(self) -> &'static str {
         match self {
-            Suite::PqHybrid768 => "X25519 + ML-KEM-768, AES-256-GCM, HKDF-SHA-384",
-            Suite::Cnsa1024 => "ML-KEM-1024, AES-256-GCM, HKDF-SHA-384 (CNSA 2.0)",
+            Suite::PqHybrid768 => "X25519 + ML-KEM-768, ML-DSA-65, AES-256-GCM, HKDF-SHA-384",
+            Suite::Cnsa1024 => "ML-KEM-1024, ML-DSA-87, AES-256-GCM, HKDF-SHA-384 (CNSA 2.0)",
         }
     }
 
@@ -62,6 +63,36 @@ impl Suite {
         match self {
             Suite::PqHybrid768 => &kem::ML_KEM_768,
             Suite::Cnsa1024 => &kem::ML_KEM_1024,
+        }
+    }
+
+    pub(crate) fn mldsa_signing(self) -> &'static signature::PqdsaSigningAlgorithm {
+        match self {
+            Suite::PqHybrid768 => &signature::ML_DSA_65_SIGNING,
+            Suite::Cnsa1024 => &signature::ML_DSA_87_SIGNING,
+        }
+    }
+
+    pub(crate) fn mldsa_verification(self) -> &'static signature::PqdsaVerificationAlgorithm {
+        match self {
+            Suite::PqHybrid768 => &signature::ML_DSA_65,
+            Suite::Cnsa1024 => &signature::ML_DSA_87,
+        }
+    }
+
+    /// Length of an ML-DSA public (verifying) key.
+    pub(crate) const fn mldsa_vk_len(self) -> usize {
+        match self {
+            Suite::PqHybrid768 => 1952,
+            Suite::Cnsa1024 => 2592,
+        }
+    }
+
+    /// Length of an ML-DSA signature.
+    pub(crate) const fn mldsa_sig_len(self) -> usize {
+        match self {
+            Suite::PqHybrid768 => 3309,
+            Suite::Cnsa1024 => 4627,
         }
     }
 

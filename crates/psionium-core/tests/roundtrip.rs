@@ -1,7 +1,7 @@
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use psionium_core::{
-    EncryptOptions, Error, Identity, KEY_ID_LEN, MAX_RECIPIENTS, PublicKey, Suite, decrypt,
-    encrypt, encrypted_len, inspect,
+    EncryptOptions, Error, Identity, KEY_ID_LEN, MAX_RECIPIENTS, PublicKey, SigningKey, Suite,
+    VerifyingKey, decrypt, encrypt, encrypt_signed, encrypted_len, inspect,
 };
 
 const SMALL: u8 = 12; // 4 KiB chunks keep multi-chunk tests fast
@@ -36,7 +36,7 @@ fn roundtrip_at_chunk_boundaries_for_every_suite() {
             let file = seal(&[&id], &data, SMALL);
             assert_eq!(
                 file.len() as u64,
-                encrypted_len(suite, 1, SMALL, len as u64),
+                encrypted_len(suite, 1, SMALL, len as u64, false),
                 "{suite} len {len}"
             );
             assert_eq!(open(&id, &file).unwrap(), data, "{suite} len {len}");
@@ -252,4 +252,132 @@ fn inspect_reports_header_without_keys() {
         vec![a.public_key().key_id(), b.public_key().key_id()]
     );
     assert!(inspect(&b"PSEN"[..]).is_err());
+}
+
+fn seal_signed(recipients: &[&Identity], signer: &SigningKey, data: &[u8]) -> Vec<u8> {
+    let keys: Vec<PublicKey> = recipients.iter().map(|i| i.public_key().clone()).collect();
+    let mut out = Vec::new();
+    encrypt_signed(
+        &keys,
+        signer,
+        data,
+        &mut out,
+        &EncryptOptions { chunk_log2: SMALL },
+    )
+    .unwrap();
+    out
+}
+
+#[test]
+fn signed_files_report_a_verified_signer() {
+    for suite in Suite::ALL {
+        let alice = Identity::generate(suite).unwrap();
+        let bob = Identity::generate(suite).unwrap();
+        let signer = alice.signing_key().unwrap();
+        for len in [0, 1, CHUNK, 2 * CHUNK + 9] {
+            let data = random(len);
+            let file = seal_signed(&[&bob], signer, &data);
+            assert_eq!(
+                file.len() as u64,
+                encrypted_len(suite, 1, SMALL, len as u64, true)
+            );
+            let mut out = Vec::new();
+            let result = decrypt(&bob, &file[..], &mut out).unwrap();
+            assert_eq!(out, data);
+            assert_eq!(result.signer.as_ref(), alice.verifying_key());
+            assert_eq!(
+                inspect(&file[..]).unwrap().signer.as_ref(),
+                alice.verifying_key()
+            );
+        }
+    }
+}
+
+#[test]
+fn unsigned_files_report_no_signer() {
+    let bob = Identity::generate(Suite::default()).unwrap();
+    let file = seal(&[&bob], b"plain", SMALL);
+    let mut out = Vec::new();
+    assert!(decrypt(&bob, &file[..], &mut out).unwrap().signer.is_none());
+}
+
+#[test]
+fn signature_covers_header_payload_and_trailer() {
+    let alice = Identity::generate(Suite::default()).unwrap();
+    let bob = Identity::generate(Suite::default()).unwrap();
+    let data = random(2 * CHUNK + 3);
+    let file = seal_signed(&[&bob], alice.signing_key().unwrap(), &data);
+    let sig_start = file.len() - 3309;
+
+    // A corrupted signature.
+    let mut f = file.clone();
+    f[sig_start + 100] ^= 1;
+    assert!(matches!(open(&bob, &f), Err(Error::Signature)));
+
+    // A missing signature: the last chunk then looks like part of the trailer.
+    assert!(open(&bob, &file[..sig_start]).is_err());
+
+    // Extra bytes after the signature.
+    let mut f = file.clone();
+    f.push(0);
+    assert!(open(&bob, &f).is_err());
+
+    // A signature truncated by one byte.
+    assert!(open(&bob, &file[..file.len() - 1]).is_err());
+}
+
+#[test]
+fn signer_and_recipient_suites_must_match() {
+    let bob = Identity::generate(Suite::PqHybrid768).unwrap();
+    let cnsa_signer = SigningKey::generate(Suite::Cnsa1024).unwrap();
+    let mut out = Vec::new();
+    let r = encrypt_signed(
+        &[bob.public_key().clone()],
+        &cnsa_signer,
+        &b"x"[..],
+        &mut out,
+        &EncryptOptions::default(),
+    );
+    assert!(matches!(r, Err(Error::MixedSuites)));
+}
+
+#[test]
+fn unknown_header_flags_are_rejected() {
+    let bob = Identity::generate(Suite::default()).unwrap();
+    let mut file = seal(&[&bob], b"x", SMALL);
+    file[8] |= 0x80;
+    assert!(matches!(open(&bob, &file), Err(Error::Unsupported(_))));
+    assert!(matches!(inspect(&file[..]), Err(Error::Unsupported(_))));
+}
+
+#[test]
+fn signing_keys_survive_text_encoding() {
+    for suite in Suite::ALL {
+        let key = SigningKey::generate(suite).unwrap();
+        let restored = SigningKey::from_secret_str(&key.to_secret_string()).unwrap();
+        assert_eq!(restored.verifying_key(), key.verifying_key());
+        let vk_text = key.verifying_key().to_string();
+        assert!(vk_text.starts_with("psionvk:"));
+        assert_eq!(
+            &vk_text.parse::<VerifyingKey>().unwrap(),
+            key.verifying_key()
+        );
+    }
+    let id = Identity::generate(Suite::default()).unwrap();
+    let contents = id.to_file_contents("2026-10-16T00:00:00Z").unwrap();
+    assert!(contents.contains("psionss:") && contents.contains("# verify key: psionvk:"));
+    let back = Identity::from_file_contents(&contents).unwrap();
+    assert_eq!(back.verifying_key(), id.verifying_key());
+    // An identity file without a signing key still loads, and simply cannot sign.
+    let decrypt_only: String = contents
+        .lines()
+        .filter(|l| !l.starts_with("psionss:"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        Identity::from_file_contents(&decrypt_only)
+            .unwrap()
+            .signing_key()
+            .is_none()
+    );
 }

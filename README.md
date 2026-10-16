@@ -1,51 +1,87 @@
 # pSIONIUM
 
-Post-quantum protection for the data companies keep: files, secrets and application fields.
+Post-quantum protection for the data you keep. `psion` encrypts and signs files with NIST's post-quantum algorithms, and `psion scan` finds the cryptography in your systems that quantum computers will break.
 
-pSIONIUM 3 is being rebuilt from scratch on NIST-standard algorithms (ML-KEM, ML-DSA, SLH-DSA, AES-256). The product plan is in the PORTAL VII workspace.
+- **Encrypt** to one or more people with hybrid X25519 + ML-KEM-768 (FIPS 203), or ML-KEM-1024 for CNSA 2.0. AES-256-GCM in authenticated chunks streams files of any size in a few MB of memory.
+- **Sign** with ML-DSA (FIPS 204) so recipients can prove who sent a file.
+- **Protect keys** with a passphrase (Argon2id) by default.
+- **Scan** source code, dependencies, certificates, SSH keys and live TLS servers for RSA, elliptic curves, Diffie-Hellman and DSA, and export a CycloneDX 1.6 CBOM.
 
-## What works today
+All cryptographic primitives come from [AWS-LC](https://github.com/aws/aws-lc) via `aws-lc-rs`, except Argon2id passphrase hashing, which comes from RustCrypto's [`argon2`](https://crates.io/crates/argon2). pSIONIUM's own crates contain no `unsafe` code.
 
-- **`psionium-core`** (Rust library): the [`.psen` v2 format](docs/psen-v2.md). Files are encrypted to one or more recipients with X25519 + ML-KEM-768 (or ML-KEM-1024 for CNSA 2.0) and AES-256-GCM in authenticated 64 KiB chunks. Built on AWS-LC (`aws-lc-rs`); no `unsafe` code.
-- **`psion`** (command line): create identities, encrypt, decrypt and inspect files.
+> **Status:** the format and code have not yet had an independent cryptographic review. Until they have, don't rely on pSIONIUM alone for data you cannot afford to lose. See [SECURITY.md](SECURITY.md) and [the threat model](docs/threat-model.md).
 
-Measured on an Apple Silicon Mac: a 256 MB file encrypts or decrypts in about 0.2 s with 3.3 MB of memory; the size overhead is 16 bytes per 64 KiB plus a header of about 1.4 KB per recipient.
+## Install
 
-## Build and try
+On macOS (Apple silicon or Intel) and Linux (x86-64 or ARM64, any distribution):
 
 ```bash
-cargo build --release
-./target/release/psion keygen -o me.key          # prints your public key (psionpk:…)
-./target/release/psion encrypt -r psionpk:… report.pdf
-./target/release/psion decrypt -i me.key report.pdf.psen
-./target/release/psion inspect report.pdf.psen
+curl -fsSL https://raw.githubusercontent.com/Chandu00756/psionium/main/install.sh | sh
 ```
 
-Use `--suite cnsa-1024` with `keygen` for ML-KEM-1024 keys. `-R team.txt` encrypts to every public key listed in a file. Decryption writes to a temporary file and keeps it only when the whole file authenticates.
+The script downloads the release for your machine, checks it against the release's `SHA256SUMS`, and installs `psion` to `~/.local/bin` (set `PSION_INSTALL_DIR` to change it, `PSION_VERSION=v1.0.0` to pin a version). It needs only `curl` or `wget`.
 
-## Tests
+On Windows, or to install by hand, download the archive for your platform from the [releases page](https://github.com/Chandu00756/psionium/releases), check it with `sha256sum --check --ignore-missing SHA256SUMS`, and put `psion` on your `PATH`. On macOS, a binary downloaded with a web browser is quarantined; run `xattr -d com.apple.quarantine psion` once to allow it.
+
+To build from source with Rust 1.88 or later:
+
+```bash
+cargo install --locked --git https://github.com/Chandu00756/psionium psion
+```
+
+## Quick start
+
+```bash
+# Create your identity (asks for a passphrase) and share the printed public key.
+psion keygen -o ~/.psion/me.key
+
+# Encrypt to a colleague, signed as you.
+psion encrypt -r psionpk:… --sign-with ~/.psion/me.key quarterly.xlsx      # writes quarterly.xlsx.psen
+
+# Decrypt, and insist it came from them.
+psion decrypt -i ~/.psion/me.key --signed-by psionvk:… quarterly.xlsx.psen
+
+# Find quantum-vulnerable cryptography in a project and on a server.
+psion scan ./my-app --tls api.example.com
+```
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `psion keygen [-o FILE] [--suite pq-hybrid-768\|cnsa-1024]` | New identity: decryption and signing keys. Prints the public key (`psionpk:`). Passphrase protected unless `--no-passphrase`. |
+| `psion pubkey -i FILE [--verify-key]` | Prints the public key, or the verifying key (`psionvk:`) others use to check your signatures. |
+| `psion encrypt -r KEY… [-R FILE] [--sign-with IDENTITY] [-o OUT] [INPUT]` | Encrypts to every recipient. Reads standard input and writes standard output when no files are given. |
+| `psion decrypt -i IDENTITY [--signed-by KEY…] [-o OUT] [INPUT]` | Decrypts and reports the signature. With `--signed-by`, unsigned files and other signers are refused. |
+| `psion inspect FILE` | Shows a file's suite, chunk size, recipients and signer without decrypting. |
+| `psion passphrase -i IDENTITY [--remove]` | Adds, changes or removes an identity's passphrase. |
+| `psion scan [PATH…] [--tls HOST[:PORT]…] [--format text\|markdown\|json\|cbom] [--fail-on quantum-vulnerable\|weak]` | Quantum-readiness scan. Exit status 2 with `--fail-on` when matching findings exist. |
+
+For scripts, `--passphrase-file FILE` reads a passphrase from the first line of a file instead of prompting, and `-` as a file name means standard input or output.
+
+Decrypting to standard output streams plaintext as it is authenticated, chunk by chunk; the command fails at the end if the file is truncated or its signature is missing or wrong. When writing to a file, `psion` keeps the output only if everything checks out.
+
+## Documentation
+
+- [The `.psen` v2 format](docs/psen-v2.md), with an independent [Go implementation](interop/go) that CI checks against `psion` in both directions
+- [pSIONIUM Scan](docs/scan.md)
+- [Threat model](docs/threat-model.md)
+- [Production readiness checklist](docs/production-readiness.md)
+- [Security policy](SECURITY.md) and [changelog](CHANGELOG.md)
+
+## Development
 
 ```bash
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all --check
+cargo build -p psion && (cd interop/go && PSION=../../target/debug/psion go test ./...)
 ```
 
-The tests cover round trips at every chunk boundary for both suites, several recipients, wrong keys, header and payload tampering, chunk reordering, truncation and extension, corrupted secret keys, and the command line end to end.
+The suite covers round trips at every chunk boundary for both suites, several recipients, signatures and required signers, passphrase protection, committed test vectors, thousands of random file corruptions (`PSIONIUM_MUTATIONS=200000` for a longer run), the scanner against a fixture project and live local TLS servers, the command line end to end, and interoperability with a second implementation written from the specification.
 
-## Not yet done
+The `legacy` branch holds the original pSIONIUM code recovered from VS Code's local history on 2026-10-16; it is reference only.
 
-- An independent review of the format and implementation. Until then, don't rely on it alone for irreplaceable data.
-- Published test vectors, fuzzing, passphrase-protected identity files and hardware-backed keys.
-- Sender signatures (ML-DSA) and the Scan, Vault and SDK products from the plan.
+## License
 
-## Branches
-
-- `main`: pSIONIUM 3 (new work starts here).
-- `legacy`: the original pSIONIUM code (Python backend, Rust 2.0 workspace, Flutter app), recovered from VS Code's local history on 2026-10-16 after the original repository was lost. Reference only; nothing in it is production-ready.
-
-## Ground rules
-
-- No home-made cryptography on the encryption path; standard algorithms from production libraries only.
-- Hybrid key exchange by default (X25519 + ML-KEM-768); a CNSA 2.0 suite for customers who need it.
-- Every encrypted object records its algorithm suite so keys can be re-wrapped as standards change.
-- Never commit credentials.
+Apache-2.0. See [LICENSE](LICENSE).

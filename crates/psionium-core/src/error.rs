@@ -42,6 +42,12 @@ pub enum Error {
     /// A chunk size outside the allowed range was requested.
     #[error("chunk size must be between 2^12 and 2^24 bytes")]
     ChunkSize,
+    /// A passphrase problem: wrong passphrase, too short, or the identity is not protected.
+    #[error("{0}")]
+    Passphrase(&'static str),
+    /// The file's sender signature does not verify.
+    #[error("the sender signature is invalid: the file was modified or not signed by this key")]
+    Signature,
     /// A cryptographic primitive reported failure.
     #[error("a cryptographic operation failed")]
     Crypto,

@@ -10,6 +10,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use zeroize::Zeroizing;
 
 use crate::error::{Error, Result};
+use crate::sign::{SigningKey, VerifyingKey};
 use crate::suite::{Suite, X25519_LEN};
 
 const PUBLIC_PREFIX: &str = "psionpk:";
@@ -116,10 +117,11 @@ pub struct Identity {
     x25519: Option<agreement::PrivateKey>,
     mlkem: kem::DecapsulationKey,
     public: PublicKey,
+    signing: Option<SigningKey>,
 }
 
 impl Identity {
-    /// Generates a new identity for a suite.
+    /// Generates a new identity for a suite, with an encryption key pair and a signing key.
     pub fn generate(suite: Suite) -> Result<Self> {
         let x25519 = if suite.has_x25519() {
             Some(agreement::PrivateKey::generate(&agreement::X25519)?)
@@ -128,7 +130,9 @@ impl Identity {
         };
         let mlkem = kem::DecapsulationKey::generate(suite.kem())?;
         let ek = mlkem.encapsulation_key()?.key_bytes()?;
-        Identity::assemble(suite, x25519, mlkem, ek.as_ref())
+        let mut identity = Identity::assemble(suite, x25519, mlkem, ek.as_ref())?;
+        identity.signing = Some(SigningKey::generate(suite)?);
+        Ok(identity)
     }
 
     fn assemble(
@@ -148,6 +152,7 @@ impl Identity {
             x25519,
             mlkem,
             public,
+            signing: None,
         })
     }
 
@@ -161,7 +166,17 @@ impl Identity {
         &self.public
     }
 
-    /// The secret key as text (`psionsk:…`). Keep it secret.
+    /// The signing key used to sign files sent from this identity, if it has one.
+    pub fn signing_key(&self) -> Option<&SigningKey> {
+        self.signing.as_ref()
+    }
+
+    /// The public key others use to check this identity's signatures, if it has a signing key.
+    pub fn verifying_key(&self) -> Option<&VerifyingKey> {
+        self.signing.as_ref().map(SigningKey::verifying_key)
+    }
+
+    /// The secret decryption key as text (`psionsk:…`). Keep it secret.
     pub fn to_secret_string(&self) -> Result<Zeroizing<String>> {
         let mut raw = Zeroizing::new(Vec::with_capacity(2 + self.suite.sk_len()));
         raw.extend_from_slice(&self.suite.id().to_be_bytes());
@@ -207,32 +222,51 @@ impl Identity {
         Identity::assemble(suite, x25519, mlkem, ek)
     }
 
-    /// The contents of an identity file: comments with the public key, then the secret key.
+    /// The contents of an identity file: comments with the public keys, then the secret keys.
     pub fn to_file_contents(&self, created: &str) -> Result<Zeroizing<String>> {
         let secret = self.to_secret_string()?;
-        Ok(Zeroizing::new(format!(
+        let mut out = Zeroizing::new(format!(
             "# pSIONIUM identity. Keep this file secret: anyone with it can decrypt your files.\n\
              # created: {created}\n\
              # suite: {} ({})\n\
-             # public key: {}\n\
-             {}\n",
+             # public key: {}\n",
             self.suite.name(),
             self.suite.description(),
             self.public,
-            &*secret
-        )))
+        ));
+        if let Some(signing) = &self.signing {
+            out.push_str(&format!("# verify key: {}\n", signing.verifying_key()));
+        }
+        out.push_str(&secret);
+        out.push('\n');
+        if let Some(signing) = &self.signing {
+            out.push_str(&signing.to_secret_string());
+            out.push('\n');
+        }
+        Ok(out)
     }
 
-    /// Reads an identity file: the first line starting with `psionsk:` is the secret key.
+    /// Reads an identity file: the first `psionsk:` line is the decryption key and the first
+    /// `psionss:` line, if any, is the signing key.
     pub fn from_file_contents(contents: &str) -> Result<Self> {
-        let line = contents
-            .lines()
-            .map(str::trim)
+        let mut lines = contents.lines().map(str::trim);
+        let line = lines
+            .clone()
             .find(|l| l.starts_with(SECRET_PREFIX))
             .ok_or(Error::Key(
                 "no \"psionsk:\" line found in the identity file",
             ))?;
-        Identity::from_secret_str(line)
+        let mut identity = Identity::from_secret_str(line)?;
+        if let Some(sig_line) = lines.find(|l| SigningKey::is_signing_prefix(l)) {
+            let signing = SigningKey::from_secret_str(sig_line)?;
+            if signing.suite() != identity.suite {
+                return Err(Error::Key(
+                    "the signing key's suite differs from the identity's",
+                ));
+            }
+            identity.signing = Some(signing);
+        }
+        Ok(identity)
     }
 
     pub(crate) fn x25519(&self) -> Option<&agreement::PrivateKey> {
@@ -271,7 +305,7 @@ fn embedded_encapsulation_key(suite: Suite, dk: &[u8]) -> Result<&[u8]> {
     Ok(ek)
 }
 
-fn split_suite(raw: &[u8]) -> Result<(Suite, &[u8])> {
+pub(crate) fn split_suite(raw: &[u8]) -> Result<(Suite, &[u8])> {
     if raw.len() < 2 {
         return Err(Error::Key("key is too short"));
     }

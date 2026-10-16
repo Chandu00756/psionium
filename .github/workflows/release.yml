@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the crate version
+        run: |
+          version=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
+
+  build:
+    needs: check-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux binaries are static (musl) so they run on any distribution, including old ones.
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, archive: tar.gz, cross: true, runs: true, test: true }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest, archive: tar.gz, cross: true, runs: false, test: false }
+          - { target: aarch64-apple-darwin, os: macos-latest, archive: tar.gz, cross: false, runs: true, test: true }
+          - { target: x86_64-apple-darwin, os: macos-latest, archive: tar.gz, cross: false, runs: false, test: false }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, archive: zip, cross: false, runs: true, test: true }
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - if: matrix.cross
+        uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+      - if: runner.os == 'Windows'
+        uses: ilammy/setup-nasm@v1
+      - name: Test
+        if: matrix.test
+        run: cargo test --workspace --locked
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }} -p psion
+      - name: Package
+        shell: bash
+        run: |
+          name="psion-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          mkdir "$name"
+          bin="target/${{ matrix.target }}/release/psion"
+          [ -f "$bin.exe" ] && bin="$bin.exe"
+          cp "$bin" README.md LICENSE SECURITY.md CHANGELOG.md "$name/"
+          if [ "${{ matrix.runs }}" = "true" ]; then "$name/$(basename "$bin")" --version; fi
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            7z a "$name.zip" "$name" > /dev/null
+            echo "ASSET=$name.zip" >> "$GITHUB_ENV"
+          else
+            tar czf "$name.tar.gz" "$name"
+            echo "ASSET=$name.tar.gz" >> "$GITHUB_ENV"
+          fi
+      # Build provenance attestations need a public repository (or GitHub Enterprise Cloud).
+      - if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ env.ASSET }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ env.ASSET }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: Release notes
+        env:
+          PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          awk '/^## /{n++} n==1' CHANGELOG.md | tail -n +2 > notes.md
+          {
+            echo
+            echo "## Verify your download"
+            echo
+            echo '```bash'
+            echo 'sha256sum --check --ignore-missing SHA256SUMS'
+            if [ "$PRIVATE" != "true" ]; then
+              echo "gh attestation verify psion-${{ github.ref_name }}-x86_64-unknown-linux-musl.tar.gz --repo ${{ github.repository }}"
+            fi
+            echo '```'
+          } >> notes.md
+          cat notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: dist/*
