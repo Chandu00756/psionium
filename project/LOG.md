@@ -2,6 +2,22 @@
 
 Newest first. Every session adds one entry: date, who, what was done, how it was verified, what is left.
 
+## 2026-10-16 — Claude (Opus 5.5): full platform design written
+
+**Done**
+- Answered the owner's question of what exists: the released CLI (local encrypt/decrypt/sign/scan) only. No interactive shell, accounts, transfer, web app, apps, licensing or admin yet.
+- Checked the old CLI: the recovered `psionium_shell.py` (cmd prompt) and `psionium_desktop_shell.py` / `backend/psionium_terminal_shell.py` (Tkinter window, black background, bold green Courier, `pSIONIUM>` prompt, history; commands encode/decode/compress/decompress/api execute). A more colorful version, if it existed, was not in VS Code history.
+- Read the 26 PVII documents (converted to text) and mapped every idea in `design/13-research-track.md`.
+- Wrote `project/design/` 01–14 and rewrote `ROADMAP.md` into 8 stages linked to the design; updated `README.md`, `RULES.md`, `VISION.md`, `STATUS.md`, `DECISIONS.md`.
+- Confirmed the GitHub repository is public; the owner installed v1.0.0 with `install.sh`.
+
+**Verified**
+- Every relative link in `project/` resolves (checked with a script); docs only, no code changed.
+
+**Left / next agent**
+- Ask the owner D11 (shell brand) if needed, then start Stage 2 (interactive shell) per `design/05-interactive-cli.md`.
+- Owner items in `design/14-owner-decisions.md`.
+
 ## 2026-10-16 — Claude (Opus 5.5): v1.0.0 released
 
 **Done**

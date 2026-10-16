@@ -2,6 +2,27 @@
 
 Newest first. Each entry: the decision, why, and what would make us revisit it.
 
+## 2026-10-16 — Platform design adopted (owner request)
+The owner asked for the full business platform to be designed end to end before more building: interactive shell, accounts, secure transfer, web and apps, licensing, admin, back office. The design is `project/design/` (01–14). **Why:** so any agent builds the same thing in the same order. **Revisit:** through the change process in `design/README.md`.
+
+## 2026-10-16 — Open core with service-enforced licensing
+The core, format and local CLI stay free and open source; paid features are those that need the service or a signed license file (self-hosted), enforced server-side. **Why:** licensing code inside open-source software can be removed, and keeping the core open builds trust. Details: `design/08-licensing.md`.
+
+## 2026-10-16 — Accounts and a Key Directory replace manual key exchange
+People find each other by email/handle; public keys come from a Directory with a transparency log and client-side key-change warnings; device keys and an Account Key let one identity work on many devices; recovery by another device, Recovery Kit, or org escrow. **Why:** copying keys by hand does not work for a business product. Details: `design/03-security-model.md`.
+
+## 2026-10-16 — Guest links carry the key in the URL fragment
+Recipients without accounts open files in the browser; the decryption key is in the `#fragment`, never sent to the server, optionally combined with a passcode and email one-time code. **Why:** "send like WhatsApp" to anyone, without breaking zero knowledge. Needs `.psen` v3 and review.
+
+## 2026-10-16 — Managed decryption only as an opt-in enterprise exception
+Org-held keys in the customer's own KMS/HSM and a customer-hosted worker; users are told. **Why:** some regulated customers must archive or scan files; PORTAL VII still never holds plaintext.
+
+## 2026-10-16 — Cloud reuses TaskFlow's stack
+Go services, PostgreSQL, Redis, Next.js, Docker Compose on Oracle Cloud first; crypto only in the Rust core (WASM/FFI to clients). **Why:** proven in production by the same owner; less to learn and operate.
+
+## 2026-10-16 — The interactive shell lives in the same `psion` binary
+`psion` alone opens the full-screen shell; `psion <command>` stays the scripting interface, unchanged. The original pSIONIUM terminal look (black, bold green, `pSIONIUM>` prompt) is kept as the `classic` theme. **Why:** one tool to install, and scripts never break.
+
 ## 2026-10-16 — Independent Go implementation as a CI gate
 A second implementation written only from `docs/psen-v2.md` (Go standard library ML-KEM/X25519/HKDF/AES-GCM, CIRCL for ML-DSA and expanded ML-KEM keys) must read psion's files and write files psion reads. **Why:** proves the spec is complete and that AWS-LC agrees with independent implementations, short of an external audit. **Revisit:** never remove; extend when the format grows.
 

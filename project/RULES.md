@@ -11,6 +11,12 @@ These come from the owner's standing instructions and from what a security produ
 5. **Outward-facing actions need explicit confirmation:** making a repository public, publishing releases or tags, deploying the website, DNS, sending email, posting anywhere.
 6. **Credentials:** never print secrets in chat; never enter the owner's real credentials anywhere; use test values only on local development hosts. The production TaskFlow server is read-only diagnostics, and its `.env` is never edited by an agent.
 
+## Design alignment
+
+- `design/` is the agreed design. Build what it says; if something there is wrong or impossible, stop, explain why to the owner, and change the design document (with a `DECISIONS.md` entry) before changing direction in code.
+- Never start a roadmap item whose owner decision (`design/14-owner-decisions.md`) is still open.
+- Keep the free/licensed boundary in `design/08-licensing.md` and the zero-knowledge rules in `design/03-security-model.md` in every feature.
+
 ## Engineering rules for this repository
 
 - **No new cryptography.** Only standardized algorithms from AWS-LC (Argon2id from RustCrypto). Any change to the format or key derivation needs a spec change in `docs/psen-v2.md`, a format version decision, and updated Go interop.

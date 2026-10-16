@@ -4,7 +4,9 @@ Last updated: 2026-10-16, after the `v1.0.0` release (commit `1aa8086`). Every a
 
 ## Summary
 
-pSIONIUM 1.0 (the `psion` command line: encrypt, sign, decrypt, scan) is **released as v1.0.0** on GitHub: https://github.com/Chandu00756/psionium/releases/tag/v1.0.0. The repository is still **private**, so only collaborators can download it; public downloads, `install.sh` and the website links work once the owner makes it public. The cloud Vault, apps and SDK (see `VISION.md`) are not started.
+pSIONIUM 1.0 (the `psion` command line: encrypt, sign, decrypt, scan) is **released as v1.0.0** on GitHub: https://github.com/Chandu00756/psionium/releases/tag/v1.0.0. The repository is **public** (confirmed 2026-10-16), and the owner installed it with the one-line `install.sh` on macOS.
+
+The full platform the owner wants (interactive shell, accounts, secure transfer, web app, desktop/mobile apps, licensing, admin console, staff back office, Scan dashboard, SDKs) is **designed but not built**. The design is in [`design/`](design/README.md); the build order is in [`ROADMAP.md`](ROADMAP.md). The table "What exists today vs. what is planned" in `design/01-products-and-journeys.md` is the quick answer to "do we have X?".
 
 ## What exists and works
 
@@ -32,13 +34,9 @@ Totals at `1aa8086`: 42 Rust tests pass on Linux, macOS and Windows (1 ignored: 
 | `~/Desktop/PVII` | The owner's original idea documents (charter, architecture, research proposal) |
 | TaskFlow `~/Taskflow` (live at taskflow.portalvii.com) | Separate product; its stack (Go services, PostgreSQL, Redis, Next.js) is the planned base for the Vault cloud service |
 
-## Waiting on the owner (agents must not do these without explicit approval)
+## Waiting on the owner
 
-1. Make `github.com/Chandu00756/psionium` public. This turns on public downloads of v1.0.0, `install.sh`, the website links and provenance attestations for future releases. Alternative: a separate public release repository.
-2. Commit and push the website pSIONIUM pages (after step 1), and decide on the claims-cleanup session's Vercel fix for the other pages.
-3. Confirm `chandu@portalvii.com` receives mail (it is the private vulnerability address in `SECURITY.md`) and turn on GitHub private vulnerability reporting once public.
-4. Commission an independent cryptographic review of the format and code. This cannot be self-certified; until it is done every release and page says so.
-5. Decide what the untracked `flutter/` folder (a clone of the Flutter SDK) and `.vscode/` in this repository are for; they were not created by an agent and are not committed.
+All open owner decisions and actions are tracked in [`design/14-owner-decisions.md`](design/14-owner-decisions.md). The ones blocking work right now: push the rewritten website pages (D13), decide on the untracked `flutter/` and `.vscode/` folders (D12), confirm the security mailbox (A1), and the brand for the interactive shell (D11, needed for Stage 2). The independent cryptographic review (D10/A5) is required before customers' irreplaceable data.
 
 ## Known gaps (not blocking 1.0 CLI, needed for the vision)
 

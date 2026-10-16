@@ -12,8 +12,9 @@ Large vendors serve large enterprises and defense. Mid-size regulated companies 
 
 ## The end outcome
 
-pSIONIUM becomes the post-quantum data protection platform for those companies, built from three products on one open, reviewed cryptographic core:
+pSIONIUM becomes the post-quantum data protection platform for those companies, built on one open, reviewed cryptographic core. People never copy keys by hand: they have accounts, find each other by email, and send files the way they send messages, while everything stays end-to-end encrypted, signed and post-quantum. The full design is in [`design/`](design/README.md). The products:
 
+0. **pSIONIUM Transfer (free tier + paid; the everyday product).** Send files to people by email or handle, or to anyone with a secure link; they receive them in an inbox, see that they really came from you, and open them in one click, in the browser, or automatically into a folder. Request files from clients. Track delivery, revoke, set expiry. Works in the web app, desktop and mobile apps (share sheet, right-click), and the interactive `psion` shell. Design: `design/04-secure-transfer.md`.
 1. **pSIONIUM Scan (free; brings customers in).** Finds every place a company depends on quantum-vulnerable cryptography: source code, dependencies, certificates, keys, live servers, and eventually cloud accounts and running systems. Produces a cryptography bill of materials (CBOM) and a plain-language migration plan an auditor understands. Runs in a terminal, in CI (GitHub Action), and as a hosted report.
 2. **pSIONIUM Vault (paid; the core business).** Protects files, folders and secrets with post-quantum encryption and signatures:
    - the `.psen` format and `psion` command line (exists today),
@@ -23,6 +24,8 @@ pSIONIUM becomes the post-quantum data protection platform for those companies, 
    - a tamper-evident audit log (hash chain with anchors),
    - a zero-knowledge cloud service: it stores only ciphertext and wrapped keys, never plaintext.
 3. **pSIONIUM SDK (usage-based).** Field-level encryption and tokenization for Go, TypeScript, Python and Rust, so developers protect PII, health and payment data inside their own apps, with bring-your-own-key from AWS KMS, Google Cloud KMS or an HSM. TaskFlow is the first integration (encrypted attachments and custom fields).
+
+Around all products: accounts with passkeys, MFA and SSO; organizations with an admin console, policies and audit logs; licensing with plans, seats and signed licenses; and PORTAL VII's own back office for sales, billing, support and partners (`design/07`, `design/08`, `design/09`). The open-source `psion` CLI, with a beautiful interactive shell (`design/05`), stays free for local encryption and scanning.
 
 Once that core is proven and customers ask for it: a post-quantum proxy for legacy applications, anomaly alerts on key usage, compliance evidence packs mapped to NIST and CNSA 2.0, threshold (MPC) key custody, and research tracks (DIBLE, FHE) that only reach products after publication and review.
 
