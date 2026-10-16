@@ -63,6 +63,7 @@ Decrypting to standard output streams plaintext as it is authenticated, chunk by
 
 ## Documentation
 
+- [Project folder](project/README.md): vision, current status, roadmap and working rules; start here if you are picking up the project
 - [The `.psen` v2 format](docs/psen-v2.md), with an independent [Go implementation](interop/go) that CI checks against `psion` in both directions
 - [pSIONIUM Scan](docs/scan.md)
 - [Threat model](docs/threat-model.md)
