@@ -2,6 +2,22 @@
 
 Newest first. Every session adds one entry: date, who, what was done, how it was verified, what is left.
 
+## 2026-10-16 — Claude (Opus 5.5): v1.0.0 released
+
+**Done**
+- Fixed the Windows CI hang: `rpassword` reads the Windows console even with no one there, so the "no terminal" test waited forever. On Windows `psion` now prompts only when stdin or stderr is a terminal. Added `timeout-minutes` to every CI and release job. Commit `14bd645`.
+- Let the release workflow run by hand to test all builds without publishing; only tags publish.
+- Dated the changelog, tagged `v1.0.0` on `1aa8086`, release run 38944493682 published 5 archives and SHA256SUMS.
+
+**Verified**
+- CI run 38943173387 green on all jobs; Windows ran all 42 tests.
+- Release assets: checksums match; `psion 1.0.0` on macOS arm64, macOS x86-64 (Rosetta), Linux arm64 and x86-64 (Alpine); Windows `.exe` is a valid PE32+ x86-64 binary; files encrypted and signed by the released macOS binary decrypt and verify with the released Linux binary; the released Linux binary decrypts a committed vector to the same bytes as macOS.
+
+**Left / next agent**
+- Owner decisions in `STATUS.md` (public repo, website, mailbox, review, the untracked `flutter/` folder).
+- After the repo is public: run `install.sh` against the real release; the Windows binary has only been checked by CI tests and file type, not run by hand.
+- Next roadmap stage: Scan GitHub Action and HTML report.
+
 ## 2026-10-16 — Claude (Opus 5.5): pSIONIUM 1.0 built end to end, project folder created
 
 **Done**

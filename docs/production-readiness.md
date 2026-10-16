@@ -21,14 +21,14 @@ pSIONIUM goes live when every item below is checked. Each item names how it is v
 
 ## Engineering
 
-- [ ] Continuous integration on Linux, macOS and Windows: format, lint, tests, MSRV, dependency audit, Go interoperability. *Workflow written; locally verified on macOS (arm64) and Linux (Alpine musl, arm64). Checked when the first run on GitHub is green, including Windows.*
-- [ ] Release builds for macOS (Apple silicon, Intel), Linux (x86-64, ARM64, static) and Windows, with SHA-256 checksums and, on a public repository, build provenance attestations. *Workflow written; macOS Intel cross-build and Linux ARM64 musl build verified locally. Checked when the v1.0.0 workflow succeeds.*
+- [x] Continuous integration on Linux, macOS and Windows: format, lint, tests, MSRV, dependency audit, Go interoperability, with job timeouts. *Verified: GitHub Actions run 38943173387, all jobs green; 42 tests on each OS.*
+- [x] Release builds for macOS (Apple silicon, Intel), Linux (x86-64, ARM64, static) and Windows, with SHA-256 checksums and, on a public repository, build provenance attestations. *Verified: v1.0.0 release run 38944493682; downloaded assets match SHA256SUMS and run on macOS (native and Rosetta) and Linux (arm64, x86-64). Attestations start once the repository is public.*
 - [x] Versioning and changelog; `psion --version` reports the build.
 - [x] Security policy (`SECURITY.md`) with a private reporting address.
 
 ## Going live
 
-- [ ] Release v1.0.0 published on GitHub with binaries. *Needs: a public repository (or a public release repository), the changelog dated, and the `v1.0.0` tag.*
+- [x] Release v1.0.0 published on GitHub with binaries: https://github.com/Chandu00756/psionium/releases/tag/v1.0.0. *The repository is private, so downloads are limited to collaborators until it is made public.*
 - [x] Install instructions verified on a clean machine. *Verified: `install.sh` against a local copy of the release layout on macOS (curl) and on a clean Alpine container with only busybox `wget`, including a tampered archive (refused, nothing installed) and a missing version; the latest-release lookup against GitHub with both curl and wget. Re-check against the real v1.0.0 release.*
 - [ ] pSIONIUM pages on portalvii.com updated with real features, downloads and no unverified claims.
 

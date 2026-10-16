@@ -7,9 +7,10 @@ Ordered by what to do next. No dates: finish a stage's "done when" before starti
 - [x] `.psen` v2 format, spec, test vectors, Go interop implementation
 - [x] `psion` CLI with signatures, passphrases, scan
 - [x] CI and release workflows, `install.sh`, security docs
-- [ ] CI green on all jobs, including Windows: push the local Windows prompt fix and job timeouts (see `STATUS.md`), then check the latest run on `main`
-- [ ] Owner decisions in `STATUS.md` → "Waiting on the owner" (public repo, tag, website, mailbox)
-- [ ] Release v1.0.0 published; re-run `install.sh` against the real release on macOS and Linux; tick `docs/production-readiness.md`
+- [x] CI green on all jobs, including Windows (run 38943173387)
+- [x] Release v1.0.0 published (private repository) and its assets verified on macOS and Linux
+- [ ] Owner decisions in `STATUS.md` → "Waiting on the owner" (public repo, website, mailbox)
+- [ ] After the repo is public: run `install.sh` against the real release on macOS and Linux, and verify `gh attestation` on the next release
 - [ ] Website pSIONIUM pages live with working download links
 
 **Done when:** anyone can install `psion` with one command, the release has checksums and provenance, and portalvii.com describes it truthfully.
