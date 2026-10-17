@@ -19,7 +19,9 @@ On macOS (Apple silicon or Intel) and Linux (x86-64 or ARM64, any distribution):
 curl -fsSL https://raw.githubusercontent.com/Chandu00756/psionium/main/install.sh | sh
 ```
 
-The script downloads the release for your machine, checks it against the release's `SHA256SUMS`, and installs `psion` to `~/.local/bin` (set `PSION_INSTALL_DIR` to change it, `PSION_VERSION=v1.0.0` to pin a version). It needs only `curl` or `wget`.
+The script downloads the release for your machine, checks it against the release's `SHA256SUMS`, and installs `psion` to `~/.local/bin` (set `PSION_INSTALL_DIR` to change it, `PSION_VERSION=v1.1.0` to pin a version). It needs only `curl` or `wget`.
+
+To update, run the same command again: it installs the newest release over the old one, after the same checksum check. `psion --version` shows what you have.
 
 On Windows, or to install by hand, download the archive for your platform from the [releases page](https://github.com/Chandu00756/psionium/releases), check it with `sha256sum --check --ignore-missing SHA256SUMS`, and put `psion` on your `PATH`. On macOS, a binary downloaded with a web browser is quarantined; run `xattr -d com.apple.quarantine psion` once to allow it.
 

@@ -10,8 +10,8 @@ rust-version.workspace = true
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
-psionium-core = { version = "1.0.0", path = "../psionium-core" }
-psionium-scan = { version = "1.0.0", path = "../psionium-scan" }
+psionium-core = { version = "1.1.0", path = "../psionium-core" }
+psionium-scan = { version = "1.1.0", path = "../psionium-scan" }
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
 rpassword = "7.5.4"
 serde = { version = "1.0.229", features = ["derive"] }
