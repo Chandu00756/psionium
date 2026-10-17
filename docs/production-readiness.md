@@ -22,7 +22,7 @@ pSIONIUM goes live when every item below is checked. Each item names how it is v
 ## Engineering
 
 - [x] Continuous integration on Linux, macOS and Windows: format, lint, tests, MSRV, dependency audit, Go interoperability, with job timeouts. *Verified: GitHub Actions run 38943173387, all jobs green; 42 tests on each OS.*
-- [x] Release builds for macOS (Apple silicon, Intel), Linux (x86-64, ARM64, static) and Windows, with SHA-256 checksums and, on a public repository, build provenance attestations. *Verified: v1.0.0 release run 38944493682; downloaded assets match SHA256SUMS and run on macOS (native and Rosetta) and Linux (arm64, x86-64). Attestations start once the repository is public.*
+- [x] Release builds for macOS (Apple silicon, Intel), Linux (x86-64, ARM64, static) and Windows, with SHA-256 checksums and, on a public repository, build provenance attestations. *Verified: v1.0.0 release run 38944493682; downloaded assets match SHA256SUMS and run on macOS (native and Rosetta) and Linux (arm64, x86-64). v1.1.0 (release run 38990309872) is the first release with provenance attestations; `gh attestation verify` confirms the macOS arm64 archive was built by `release.yml` at `refs/tags/v1.1.0`.*
 - [x] Versioning and changelog; `psion --version` reports the build.
 - [x] Security policy (`SECURITY.md`) with a private reporting address.
 

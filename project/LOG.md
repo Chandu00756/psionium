@@ -2,6 +2,21 @@
 
 Newest first. Every session adds one entry: date, who, what was done, how it was verified, what is left.
 
+## 2026-10-16 — Claude (Opus 5.5): v1.1.0 released
+
+**Done**
+- With the owner's approval: committed Scan Stage A (`9277b28`) and the shell (`9f5809a`) as separate commits (the first was checked in its own worktree: fmt, clippy, 50 tests, audit, interop), pushed `main`.
+- CI run 38989789928 failed: clippy on current stable (1.99) flagged `unnecessary_sort_by` and `manual_is_multiple_of` (not in 1.88 locally), and on Windows the tilde test expected `/` separators. Fixed in `7d91a47`, which also replaced a test file name with `<`/`>` that Windows forbids (found by review: the Windows integration tests had not run because the unit-test binary failed first).
+- Bumped to 1.1.0 (`e7d1dcf`), tagged `v1.1.0`; release run 38990309872 published 5 archives and SHA256SUMS.
+
+**Verified**
+- CI run 38990068424 (`7d91a47`) and the CI run on `e7d1dcf`: all jobs green; Windows ran all 11 test binaries (69 passed, 1 ignored).
+- Release: `install.sh` installed v1.0.0 into a scratch folder, then the plain one-liner updated it to v1.1.0 after the checksum check; the released macOS arm64 binary decrypts a committed v1.0 vector with a valid signature and runs the shell tutorial in a real pty; `gh attestation verify` passes.
+
+**Left / next agent**
+- Lesson: CI uses the newest stable clippy; run `rustup update stable` (or watch CI) before tagging, since the local 1.88 toolchain misses newer lints.
+- Stage 2 remaining: GitHub Action (needs a repo: owner), Docker image, GitLab template, baseline custom rules, heritage utilities, `doctor`/`completions`/`update`, pty end-to-end tests in CI, `cargo-fuzz`, benchmarks, SLH-DSA.
+
 ## 2026-10-16 — Claude (Opus 5.5): the interactive pSIONIUM shell
 
 **Done**
@@ -20,7 +35,7 @@ Newest first. Every session adds one entry: date, who, what was done, how it was
 - Full suite from `RULES.md`, tests run with `CI=true` so snapshots are strict: fmt, clippy `-D warnings`, 69 tests (1 ignored, the vector writer), `cargo audit` (214 crates, clean), Go interop, `sh -n install.sh`. `.gitattributes` keeps `*.snap` at LF for Windows CI.
 
 **Left / next agent**
-- Committed locally on `main` with the owner's approval; not pushed.
+- Committed and released in v1.1.0 (see the entry above).
 - Automated pty end-to-end tests in CI; heritage `encode`/`decode`/`compress`; `doctor`, `completions`, `update`; account screens arrive with Stage 3.
 - The first key pressed during the launch animation only skips it (by design); people who type ahead may notice.
 
