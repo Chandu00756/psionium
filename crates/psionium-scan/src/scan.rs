@@ -3,7 +3,8 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::sync::LazyLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, LazyLock};
 
 use ignore::WalkBuilder;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
@@ -27,6 +28,8 @@ pub struct ScanOptions {
     /// Paths to skip, as `.gitignore`-style patterns relative to each scanned folder (for
     /// example `docs/`, `**/testdata/**` or `*.pem`).
     pub ignore: Vec<String>,
+    /// Incremented for every file read, so a caller on another thread can show progress.
+    pub progress: Option<Arc<AtomicUsize>>,
 }
 
 impl Default for ScanOptions {
@@ -36,6 +39,7 @@ impl Default for ScanOptions {
             max_file_size: 4 * 1024 * 1024,
             excerpts: true,
             ignore: Vec::new(),
+            progress: None,
         }
     }
 }
@@ -133,6 +137,9 @@ pub(crate) fn walk(
             continue;
         };
         stats.scanned += 1;
+        if let Some(progress) = &options.progress {
+            progress.fetch_add(1, Ordering::Relaxed);
+        }
         let display = display_path(root, path);
         scan_file(&display, path, &bytes, options.excerpts, findings);
     }

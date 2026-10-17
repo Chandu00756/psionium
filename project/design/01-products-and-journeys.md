@@ -5,7 +5,7 @@
 | Capability | Today | Planned (where it is designed) |
 |---|---|---|
 | Encrypt / decrypt / sign files | **Yes**: `psion encrypt/decrypt`, scripting-style CLI, keys exchanged by hand | Same engine, wrapped in accounts and transfer so nobody copies keys by hand (04, 05) |
-| Interactive, colorful CLI | **No**. The old pSIONIUM terminal (Tkinter, green on black, `pSIONIUM>` prompt, encode/compress commands) survives on the `legacy` branch as reference only | Full-screen `psion` shell (05) |
+| Interactive, colorful CLI | **Yes, local screens (2026-10-16)**: `psion` opens the full-screen shell (Home, Encrypt, Decrypt, Keys, Scan, Console, Settings, Help, tutorial). Account screens wait for Stage 3 | Full-screen `psion` shell (05) |
 | Quantum-readiness Scan | **Yes, CLI only**: `psion scan` (text, Markdown, JSON, CBOM) | GitHub Action, HTML report, hosted dashboard with monitoring (10) |
 | Website | **Partly**: product pages on portalvii.com rewritten (not yet pushed); no pricing, download page, docs site, sign-up | Marketing site, docs, download, pricing, trust center (06) |
 | Accounts, sign-in, organizations | **No** | Accounts, MFA, passkeys, SSO, orgs, roles (07) |

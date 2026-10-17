@@ -2,6 +2,28 @@
 
 Newest first. Every session adds one entry: date, who, what was done, how it was verified, what is left.
 
+## 2026-10-16 — Claude (Opus 5.5): the interactive pSIONIUM shell
+
+**Done**
+- Owner approved D11 (keep pSIONIUM and the pyramid; portal violet/pink; classic green). Recorded in `design/14` and `DECISIONS.md`.
+- `crates/psion/src/shell/`: `app` (state, keys, palette with fuzzy search), `ui` (header, screen list, bottom bar with hints and the equivalent command, toasts), `screens` (Home, Encrypt, Decrypt, Keys, Scan, Console, Settings, Help + tutorial), `form` (fields, masked secrets, path suggestions), `jobs` (child `psion` processes, scan thread), `complete` (argument splitting, completion from the clap definitions), `theme` (4 themes, truecolor/256/16-colour, `NO_COLOR`), `splash` (pyramid + wordmark animation), `config` (settings and history), `mod` (terminal setup/restore, event loop, `--plain`, `psion theme`).
+- `main.rs`: `psion` with no command opens the shell in a terminal; `shell` and `theme` commands; `--passphrase-file -`; `PSION_NO_PROMPT`.
+- `psionium-scan`: `ScanOptions::progress` and public `Finding::guidance()` for the Scan screen.
+- New dependencies: `ratatui` 0.30.2 (MSRV 1.88, brings crossterm 0.29), `serde`, `toml` in `psion`; `insta` for tests.
+- Docs: `docs/shell.md`, README, CHANGELOG, `design/05` and `design/01` status.
+
+**Verified**
+- Every journey driven through a real pseudo-terminal (a stdlib Python pty harness with a small VT100 model, in the session scratchpad): tutorial (5 real steps, temp folder removed afterwards); create a passphrase-protected identity (`~/.psion` 0700, key 0600, set as default); encrypt to self, signed, passphrase through the pipe; decrypt with valid signature, byte-identical; scan, browse findings, export HTML; prompt with Tab completion, clap errors, `cd ~`; palette theme switch saved. Terminal restored on exit (alternate screen left, cursor shown).
+- Found and fixed while doing so: `~` in path fields was passed literally to child processes; Home and bottom-bar overflow at 80×24; noisy keygen output.
+- First frame in about 6 ms (release build, animation off), well under `design/05`'s 150 ms.
+- `ratatui` is used without default features (`crossterm` only): the lockfile drops from 294 to 214 crates with identical snapshots.
+- Full suite from `RULES.md`, tests run with `CI=true` so snapshots are strict: fmt, clippy `-D warnings`, 69 tests (1 ignored, the vector writer), `cargo audit` (214 crates, clean), Go interop, `sh -n install.sh`. `.gitattributes` keeps `*.snap` at LF for Windows CI.
+
+**Left / next agent**
+- Committed locally on `main` with the owner's approval; not pushed.
+- Automated pty end-to-end tests in CI; heritage `encode`/`decode`/`compress`; `doctor`, `completions`, `update`; account screens arrive with Stage 3.
+- The first key pressed during the launch animation only skips it (by design); people who type ahead may notice.
+
 ## 2026-10-16 — Claude (Opus 5.5): Stage 2 started with Scan Stage A
 
 **Done**

@@ -3,3 +3,5 @@
 crates/psionium-core/tests/vectors/** -text
 # Shell scripts must keep Unix line endings to run.
 *.sh text eol=lf
+# Snapshot tests compare text exactly; keep Unix line endings on every OS.
+*.snap text eol=lf

@@ -31,6 +31,8 @@ cargo install --locked --git https://github.com/Chandu00756/psionium psion
 
 ## Quick start
 
+Run `psion` on its own to open the interactive shell, with a one-minute tutorial (press `t`); see [the shell guide](docs/shell.md). The same work from the command line:
+
 ```bash
 # Create your identity (asks for a passphrase) and share the printed public key.
 psion keygen -o ~/.psion/me.key
@@ -49,6 +51,8 @@ psion scan ./my-app --tls api.example.com
 
 | Command | What it does |
 |---|---|
+| `psion` or `psion shell [--theme NAME] [--no-animation] [--plain]` | The interactive pSIONIUM shell: guided encrypt, decrypt, keys and scan screens, a command palette and the classic `pSIONIUM>` prompt. |
+| `psion theme [NAME]` | Shows or saves the shell theme: `portal`, `classic`, `high-contrast` or `light`. |
 | `psion keygen [-o FILE] [--suite pq-hybrid-768\|cnsa-1024]` | New identity: decryption and signing keys. Prints the public key (`psionpk:`). Passphrase protected unless `--no-passphrase`. |
 | `psion pubkey -i FILE [--verify-key]` | Prints the public key, or the verifying key (`psionvk:`) others use to check your signatures. |
 | `psion encrypt -r KEY… [-R FILE] [--sign-with IDENTITY] [-o OUT] [INPUT]` | Encrypts to every recipient. Reads standard input and writes standard output when no files are given. |
@@ -57,7 +61,7 @@ psion scan ./my-app --tls api.example.com
 | `psion passphrase -i IDENTITY [--remove]` | Adds, changes or removes an identity's passphrase. |
 | `psion scan [PATH…] [--tls HOST[:PORT]…] [--format text\|markdown\|html\|json\|sarif\|cbom] [--fail-on quantum-vulnerable\|weak] [--baseline FILE] [--no-excerpts]` | Quantum-readiness scan. Exit status 2 with `--fail-on` when new findings (not accepted in the baseline) match. |
 
-For scripts, `--passphrase-file FILE` reads a passphrase from the first line of a file instead of prompting, and `-` as a file name means standard input or output.
+For scripts, `--passphrase-file FILE` reads a passphrase from the first line of a file instead of prompting (`--passphrase-file -` reads it from standard input), `PSION_NO_PROMPT=1` makes `psion` fail rather than prompt, and `-` as a file name means standard input or output.
 
 Decrypting to standard output streams plaintext as it is authenticated, chunk by chunk; the command fails at the end if the file is truncated or its signature is missing or wrong. When writing to a file, `psion` keeps the output only if everything checks out.
 
@@ -65,6 +69,7 @@ Decrypting to standard output streams plaintext as it is authenticated, chunk by
 
 - [Project folder](project/README.md): vision, current status, roadmap and working rules; start here if you are picking up the project
 - [The `.psen` v2 format](docs/psen-v2.md), with an independent [Go implementation](interop/go) that CI checks against `psion` in both directions
+- [The pSIONIUM shell](docs/shell.md)
 - [pSIONIUM Scan](docs/scan.md)
 - [Threat model](docs/threat-model.md)
 - [Production readiness checklist](docs/production-readiness.md)

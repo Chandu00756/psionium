@@ -40,7 +40,7 @@ Every action in the shell has a scripting equivalent, and the shell shows that e
 ## Command palette and the classic prompt
 
 - `/` or `Ctrl+K` opens a fuzzy command palette with every action.
-- `:` opens the classic prompt line `pSIONIUM> ` at the bottom with history (↑/↓), tab completion of commands, paths, contacts and flags. Commands typed here are the same as scripting commands without the `psion` prefix (`send report.pdf --to ravi@firm.com`).
+- `:` opens the classic prompt line `pSIONIUM> ` at the bottom with history (↑/↓), tab completion of commands, paths, contacts and flags. Commands typed here are the same as scripting commands without the `psion` prefix (`send report.pdf --to ravi@firm.com`). As built, `:` opens the **Console** screen, whose bottom line is the prompt and whose body keeps each command's output, like the original pSIONIUM terminal (see `DECISIONS.md`, 2026-10-16).
 - Heritage commands from the original shell are kept as utilities: `encode`/`decode` (base64, hex, base32) and `compress`/`decompress` (zstd), separate from encryption.
 
 ## Scripting-mode commands (complete list)
@@ -60,7 +60,8 @@ Every action in the shell has a scripting equivalent, and the shell shows that e
 | `org`, `license [status|activate FILE]` | Org info, license status, offline license activation (self-hosted) | Planned |
 | `scan --upload` | Upload results to the Scan dashboard | Planned |
 | `encode`, `decode`, `compress`, `decompress` | Heritage utilities | Planned |
-| `theme`, `config`, `doctor`, `update`, `completions <shell>` | Settings, diagnostics, self-update (verified signature), shell completions | Planned |
+| `shell`, `theme` | Open the shell; show or save its theme | **Exist** |
+| `config`, `doctor`, `update`, `completions <shell>` | Settings, diagnostics, self-update (verified signature), shell completions | Planned |
 
 All planned commands support `--json` and exit codes: 0 success, 1 error, 2 policy/findings failure, 3 authentication required, 4 license/entitlement required.
 

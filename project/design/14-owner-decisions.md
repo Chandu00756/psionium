@@ -16,7 +16,7 @@ Things only the owner (or PORTAL VII as a company) can decide or do. Agents must
 | D8 | SMS as an MFA option for non-admins | No SMS; passkeys + TOTP only | Stage 3 | Open |
 | D9 | Free plan limits and whether guest links need a verified sender | Verified email required to send guest links | Stage 4 | Open |
 | D10 | Independent review vendor and budget | Request quotes from 2–3 cryptography review firms; scope: `.psen` v2/v3, device linking, recovery, transparency log, licensing | Before Transfer GA | Open |
-| D11 | Brand for the interactive CLI and apps (keep "pSIONIUM", icon, colors) | Keep pSIONIUM + PORTAL VII pyramid; violet/pink + classic green theme | Stage 2 | Open |
+| D11 | Brand for the interactive CLI and apps (keep "pSIONIUM", icon, colors) | Keep pSIONIUM + PORTAL VII pyramid; violet/pink + classic green theme | Stage 2 | **Answered 2026-10-16: approved as recommended** |
 | D12 | What the untracked `flutter/` (Flutter SDK clone) and `.vscode/` in the repo are for | Keep the Flutter SDK outside the repo; add `.vscode/` to `.gitignore` or remove | Next commit touching the repo root | Open |
 | D13 | Website: approve and push the rewritten pSIONIUM pages; decide the Vercel root-directory fix from the claims-cleanup session | Push after D1 | Now | Open |
 | D14 | Data residency regions offered | US first; EU when the first EU customer asks | Business plan | Open |

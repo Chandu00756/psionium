@@ -3,7 +3,7 @@
 #![forbid(unsafe_code)]
 
 use std::fs::{self, File};
-use std::io::{self, BufReader, BufWriter, IsTerminal, Read, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,20 +16,40 @@ use psionium_core::{
 };
 use zeroize::Zeroizing;
 
+mod shell;
+
 #[derive(Parser)]
 #[command(
     name = "psion",
     version,
-    about = "Post-quantum file encryption and signing (pSIONIUM .psen v2)"
+    about = "Post-quantum file encryption and signing (pSIONIUM .psen v2)",
+    long_about = "Post-quantum file encryption and signing (pSIONIUM .psen v2).\n\nRun psion with no command to open the interactive pSIONIUM shell.",
+    args_conflicts_with_subcommands = true
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
+    #[command(flatten)]
+    shell: ShellArgs,
+}
+
+/// Options for the interactive shell.
+#[derive(Args, Clone, Default)]
+pub(crate) struct ShellArgs {
+    /// Shell theme: portal, classic, high-contrast or light [default: the saved setting]
+    #[arg(long, value_name = "NAME")]
+    theme: Option<String>,
+    /// Skip the launch animation
+    #[arg(long)]
+    no_animation: bool,
+    /// Line-by-line pSIONIUM> prompt instead of the full-screen shell
+    #[arg(long)]
+    plain: bool,
 }
 
 #[derive(Args, Clone, Default)]
 struct PassphraseSource {
-    /// Read the identity's passphrase from the first line of this file instead of prompting
+    /// Read the identity's passphrase from the first line of this file instead of prompting (`-` for standard input)
     #[arg(long, value_name = "FILE")]
     passphrase_file: Option<PathBuf>,
 }
@@ -130,6 +150,13 @@ enum Command {
         #[arg(long)]
         remove: bool,
     },
+    /// Open the interactive pSIONIUM shell (the same as running psion with no command)
+    Shell(ShellArgs),
+    /// Show or set the shell's theme: portal, classic, high-contrast or light
+    Theme {
+        /// Theme to save as the default
+        name: Option<String>,
+    },
     /// Find quantum-vulnerable cryptography in code, dependencies, certificates, keys and TLS endpoints
     Scan {
         /// Files or folders to scan [default: the current folder, unless only --tls is given]
@@ -171,7 +198,21 @@ enum Command {
 const SCAN_FINDINGS_EXIT: u8 = 2;
 
 fn main() -> ExitCode {
-    match run(Cli::parse()) {
+    let cli = Cli::parse();
+    let command = match cli.command {
+        Some(command) => command,
+        None if shell::can_run(&cli.shell) => Command::Shell(cli.shell),
+        None => {
+            use clap::CommandFactory;
+            Cli::command()
+                .error(
+                    clap::error::ErrorKind::MissingSubcommand,
+                    "a command is required when psion is not run in a terminal",
+                )
+                .exit()
+        }
+    };
+    match run(command) {
         Ok(code) => code,
         Err(e) => {
             eprintln!("psion: error: {e:#}");
@@ -180,7 +221,10 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(cli: Cli) -> Result<ExitCode> {
+fn run(command: Command) -> Result<ExitCode> {
+    if let Command::Shell(args) = command {
+        return shell::run(args).map(|()| ExitCode::SUCCESS);
+    }
     if let Command::Scan {
         paths,
         tls,
@@ -193,7 +237,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
         baseline,
         no_baseline,
         write_baseline,
-    } = cli.command
+    } = command
     {
         return scan(ScanArgs {
             paths,
@@ -209,7 +253,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             write_baseline,
         });
     }
-    run_file_command(cli.command).map(|()| ExitCode::SUCCESS)
+    run_file_command(command).map(|()| ExitCode::SUCCESS)
 }
 
 fn run_file_command(command: Command) -> Result<()> {
@@ -235,16 +279,21 @@ fn run_file_command(command: Command) -> Result<()> {
             chunk_size_log2,
             force,
             input,
-        } => encrypt(
-            &recipients,
-            &recipient_files,
-            sign_with,
-            &passphrase,
-            output,
-            chunk_size_log2,
-            force,
-            dash(input),
-        ),
+        } => {
+            if sign_with.is_some() {
+                one_use_of_stdin(&passphrase, input.as_deref())?;
+            }
+            encrypt(
+                &recipients,
+                &recipient_files,
+                sign_with,
+                &passphrase,
+                output,
+                chunk_size_log2,
+                force,
+                dash(input),
+            )
+        }
         Command::Decrypt {
             identity,
             passphrase,
@@ -253,15 +302,18 @@ fn run_file_command(command: Command) -> Result<()> {
             output,
             force,
             input,
-        } => decrypt(
-            &identity,
-            &passphrase,
-            &signed_by,
-            &signed_by_files,
-            output,
-            force,
-            dash(input),
-        ),
+        } => {
+            one_use_of_stdin(&passphrase, input.as_deref())?;
+            decrypt(
+                &identity,
+                &passphrase,
+                &signed_by,
+                &signed_by_files,
+                output,
+                force,
+                dash(input),
+            )
+        }
         Command::Inspect { input } => inspect(&input),
         Command::Passphrase {
             identity,
@@ -269,7 +321,8 @@ fn run_file_command(command: Command) -> Result<()> {
             new_passphrase_file,
             remove,
         } => change_passphrase(&identity, &current, new_passphrase_file, remove),
-        Command::Scan { .. } => unreachable!("handled in run"),
+        Command::Theme { name } => shell::theme_command(name.as_deref()),
+        Command::Scan { .. } | Command::Shell(_) => unreachable!("handled in run"),
     }
 }
 
@@ -816,7 +869,27 @@ fn new_passphrase(file: Option<&Path>) -> Result<Zeroizing<String>> {
     Ok(pass)
 }
 
+/// Refuses to read both the passphrase and the data from standard input.
+fn one_use_of_stdin(passphrase: &PassphraseSource, input: Option<&Path>) -> Result<()> {
+    if passphrase.passphrase_file.as_deref().is_some_and(is_dash)
+        && dash(input.map(Path::to_path_buf)).is_none()
+    {
+        bail!("standard input cannot carry both the passphrase and the file; name the input file");
+    }
+    Ok(())
+}
+
 fn read_passphrase_file(path: &Path) -> Result<Zeroizing<String>> {
+    if is_dash(path) {
+        // One line per passphrase, so `passphrase` can read the current and the new one in turn.
+        let mut line = Zeroizing::new(String::new());
+        io::stdin()
+            .lock()
+            .read_line(&mut line)
+            .context("could not read the passphrase from standard input")?;
+        let trimmed = line.trim_end_matches(['\r', '\n']);
+        return Ok(Zeroizing::new(trimmed.to_string()));
+    }
     let text = Zeroizing::new(
         fs::read_to_string(path).with_context(|| format!("could not read {}", path.display()))?,
     );
@@ -827,6 +900,10 @@ fn read_passphrase_file(path: &Path) -> Result<Zeroizing<String>> {
 const NO_TERMINAL: &str = "cannot ask for a passphrase without a terminal; use --passphrase-file (or --no-passphrase for keygen)";
 
 fn prompt(message: &str) -> Result<Zeroizing<String>> {
+    // Set by scripts that must never wait for a person, and by the shell for commands it runs.
+    if std::env::var_os("PSION_NO_PROMPT").is_some_and(|v| !v.is_empty() && v != "0") {
+        bail!(NO_TERMINAL);
+    }
     // On Windows the prompt reads the console even when nobody is at it (a service or CI job),
     // and would wait forever; ask only when a person can answer.
     if cfg!(windows) && !io::stdin().is_terminal() && !io::stderr().is_terminal() {

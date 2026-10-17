@@ -18,11 +18,12 @@ The complete build plan from today's CLI to the full pSIONIUM platform. Ordered 
 ## Stage 2 — The pSIONIUM shell and Scan front door (local only, no accounts)
 
 Interactive CLI (`design/05-interactive-cli.md`):
-- [ ] TUI framework in `crates/psion`: themes (classic, portal, high-contrast, light), launch animation, layout, command palette, classic `pSIONIUM>` prompt with history and completion
-- [ ] Screens that work offline: Home, Encrypt/Decrypt (guided), Keys (local identity), Scan (live progress, findings browser, export), Settings, Help with tutorial
+- [x] TUI framework in `crates/psion`: themes (classic, portal, high-contrast, light), launch animation, layout, command palette, classic `pSIONIUM>` prompt with history and completion (2026-10-16, D11 answered)
+- [x] Screens that work offline: Home, Encrypt/Decrypt (guided), Keys (local identity), Scan (live progress, findings browser, export), Settings, Help with tutorial; plus Console (the prompt's screen) and `psion --plain` (2026-10-16)
 - [ ] Heritage utilities: `encode`/`decode`, `compress`/`decompress`
 - [ ] `psion doctor`, `psion completions`, `psion update` (signature-checked self-update)
-- [ ] Snapshot tests per screen and theme at 80×24 and 200×60; scripting-mode compatibility tests unchanged
+- [x] Snapshot tests per screen and theme at 80×24 and 200×60; scripting-mode compatibility tests unchanged (2026-10-16: 29 snapshots; the 9 earlier CLI tests pass untouched)
+- [ ] Automated pseudo-terminal end-to-end tests in CI (journeys were driven through a real pty by hand on 2026-10-16; `design/05` asks for this in CI)
 Scan (`design/10-scan-product.md` Stage A):
 - [x] `--format html` report; SARIF output; baseline file; `--no-excerpts` (2026-10-16; finding fingerprints added for baselines and SARIF)
 - [ ] Custom rules in the baseline file (`design/10` Stage A; not built yet)

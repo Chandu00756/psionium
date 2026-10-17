@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### The pSIONIUM shell
+
+- `psion` with no command (or `psion shell`) opens a full-screen shell: Home, Encrypt, Decrypt, Keys, Scan (live progress, findings browser, report export), Console (the classic `pSIONIUM>` prompt with history and Tab completion), Settings and Help with a one-minute tutorial that runs real commands. Every action shows its `psion` command.
+- Themes `portal`, `classic`, `high-contrast` and `light`, adapted to the terminal's colours; `NO_COLOR` is respected. A launch animation (at most 600 ms, any key skips it; off with `--no-animation`, in CI and with `NO_COLOR`).
+- `psion --plain`: a line-by-line `pSIONIUM>` prompt that also runs commands from standard input.
+- `psion theme [NAME]` shows or saves the theme. Settings and history live in `~/.config/psion` (or `$PSION_CONFIG_DIR`).
+- Without a terminal, `psion` with no command still prints a usage error (exit status 2).
+
+### psion
+
+- `--passphrase-file -` reads the passphrase from standard input.
+- `PSION_NO_PROMPT=1` makes `psion` fail instead of asking for a passphrase.
+
 ### psion scan
 
 - `--format html`: a self-contained report (no scripts or network requests) with a summary, NIST deadlines, a chart of algorithms, and what to do about each finding.

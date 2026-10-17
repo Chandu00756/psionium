@@ -1,0 +1,11 @@
+---
+source: crates/psion/src/shell/tests.rs
+expression: summary
+---
+   13  fg Rgb(0, 0, 0) bg Rgb(255, 230, 0) BOLD
+   14  fg Rgb(0, 230, 255) bg Rgb(0, 0, 0) BOLD
+  269  fg Rgb(215, 215, 215) bg Rgb(0, 0, 0) NONE
+   65  fg Rgb(255, 230, 0) bg Rgb(0, 0, 0) BOLD
+  152  fg Rgb(255, 230, 0) bg Rgb(0, 0, 0) NONE
+  186  fg Rgb(255, 255, 255) bg Rgb(0, 0, 0) BOLD
+ 1221  fg Rgb(255, 255, 255) bg Rgb(0, 0, 0) NONE

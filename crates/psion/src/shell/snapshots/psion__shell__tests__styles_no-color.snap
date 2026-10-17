@@ -1,0 +1,8 @@
+---
+source: crates/psion/src/shell/tests.rs
+expression: summary
+---
+  247  fg Reset bg Reset BOLD
+    6  fg Reset bg Reset BOLD | REVERSED
+   11  fg Reset bg Reset BOLD | UNDERLINED
+ 1656  fg Reset bg Reset NONE

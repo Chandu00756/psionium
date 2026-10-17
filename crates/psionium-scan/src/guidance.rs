@@ -2,6 +2,13 @@
 
 use crate::model::{Category, Finding, Primitive, Source};
 
+impl Finding {
+    /// One or two sentences on how to fix or migrate what this finding found.
+    pub fn guidance(&self) -> &'static str {
+        guidance(self)
+    }
+}
+
 /// One or two sentences on how to fix or migrate what `f` found.
 pub(crate) fn guidance(f: &Finding) -> &'static str {
     let a = f.algorithm.to_ascii_uppercase();

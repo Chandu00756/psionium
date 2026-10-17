@@ -604,3 +604,149 @@ fn scan_baselines_and_report_formats() {
         .assert()
         .failure();
 }
+
+#[test]
+fn the_shell_and_its_scripting_hooks() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = dir.path().join("config");
+
+    // Without a terminal, psion with no command keeps asking for a command.
+    psion()
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("a command is required"));
+    psion()
+        .arg("shell")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("the shell needs a terminal"));
+    psion()
+        .args(["--theme", "neon", "--plain"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown theme"));
+
+    // The plain prompt runs commands from standard input.
+    psion()
+        .env("PSION_CONFIG_DIR", &config)
+        .current_dir(dir.path())
+        .arg("--plain")
+        .write_stdin("help\n# a comment\npsion inspect missing.psen\nshell\nexit\nscan .\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Commands (add --help"))
+        .stdout(predicate::str::contains("already in the shell"))
+        .stdout(predicate::str::contains("pSIONIUM Scan").not())
+        .stderr(predicate::str::contains("could not open missing.psen"));
+
+    // psion theme shows and saves the theme.
+    psion()
+        .env("PSION_CONFIG_DIR", &config)
+        .args(["theme", "classic"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Theme set to classic"));
+    psion()
+        .env("PSION_CONFIG_DIR", &config)
+        .arg("theme")
+        .assert()
+        .success()
+        .stdout("classic\n");
+    psion()
+        .env("PSION_CONFIG_DIR", &config)
+        .args(["theme", "neon"])
+        .assert()
+        .failure();
+    assert!(
+        fs::read_to_string(config.join("config.toml"))
+            .unwrap()
+            .contains("theme = \"classic\"")
+    );
+}
+
+#[test]
+fn passphrases_from_standard_input() {
+    let dir = tempfile::tempdir().unwrap();
+    let id = dir.path().join("me.key");
+    let pk = String::from_utf8(
+        psion()
+            .args(["keygen", "--passphrase-file", "-", "-o"])
+            .arg(&id)
+            .write_stdin("correct horse battery\n")
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .unwrap();
+    let plain = dir.path().join("notes.txt");
+    fs::write(&plain, "quantum-safe notes").unwrap();
+
+    psion()
+        .args([
+            "encrypt",
+            "-r",
+            pk.trim(),
+            "--passphrase-file",
+            "-",
+            "--sign-with",
+        ])
+        .arg(&id)
+        .arg(&plain)
+        .write_stdin("correct horse battery\n")
+        .assert()
+        .success();
+    let sealed = dir.path().join("notes.txt.psen");
+    let out = dir.path().join("out.txt");
+    psion()
+        .args(["decrypt", "--passphrase-file", "-", "-i"])
+        .arg(&id)
+        .arg("-o")
+        .arg(&out)
+        .arg(&sealed)
+        .write_stdin("correct horse battery\r\n")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Signature: valid"));
+    assert_eq!(fs::read_to_string(&out).unwrap(), "quantum-safe notes");
+
+    // The data and the passphrase cannot both come from standard input.
+    psion()
+        .args(["decrypt", "--passphrase-file", "-", "-i"])
+        .arg(&id)
+        .write_stdin("x")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot carry both"));
+
+    // A wrong passphrase from standard input fails cleanly.
+    psion()
+        .args(["decrypt", "--passphrase-file", "-", "--force", "-i"])
+        .arg(&id)
+        .arg("-o")
+        .arg(&out)
+        .arg(&sealed)
+        .write_stdin("wrong passphrase\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("could not unlock"));
+
+    // PSION_NO_PROMPT turns a passphrase prompt into an error.
+    psion()
+        .env("PSION_NO_PROMPT", "1")
+        .args(["pubkey", "--verify-key", "-i"])
+        .arg(&id)
+        .assert()
+        .success();
+    psion()
+        .env("PSION_NO_PROMPT", "1")
+        .args(["decrypt", "--force", "-i"])
+        .arg(&id)
+        .arg("-o")
+        .arg(&out)
+        .arg(&sealed)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot ask for a passphrase"));
+}

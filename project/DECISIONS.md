@@ -2,6 +2,17 @@
 
 Newest first. Each entry: the decision, why, and what would make us revisit it.
 
+## 2026-10-16 — How the shell is built
+- **The shell runs `psion` itself.** Guided screens and the `pSIONIUM>` prompt run the same binary as a child process with captured output, so the shell and scripting mode cannot disagree and output never corrupts the full screen. Scans run in-process on a thread for live progress.
+- **Passphrases go through a pipe.** `--passphrase-file -` reads one line from standard input; the shell writes the passphrase there, never to a file, an argument or the environment, and clears the field. Children get `PSION_NO_PROMPT=1`, so a command typed at the prompt fails with a clear message instead of grabbing the terminal; `psion --plain` runs commands in-process for people who want to type passphrases.
+- **`:` opens a Console screen** rather than a one-line overlay: its bottom line is the `pSIONIUM>` prompt and its body keeps the output, like the original terminal. `design/05` is annotated.
+- **Settings live in `config.toml`** under `$PSION_CONFIG_DIR`, `%APPDATA%\psion`, `$XDG_CONFIG_HOME/psion` or `~/.config/psion`; identities created in the shell go to `~/.psion` (0700), which the README already uses.
+- **`psion` with no command opens the shell only in a terminal**; otherwise the usage error (exit 2) is unchanged, so scripts behave as before.
+**Why:** one source of truth for behaviour, no secrets on disk, and no change for existing scripts. **Revisit:** when the account features need a long-lived API client in the shell (Stage 3), which may move work in-process.
+
+## 2026-10-16 — D11: shell and app brand (owner)
+Keep the pSIONIUM name and the PORTAL VII pyramid; the default `portal` theme uses violet/pink accents, and the `classic` theme keeps the original green-on-black terminal. **Why:** owner approved the recommendation in `design/14`. **Revisit:** a rebrand of PORTAL VII.
+
 ## 2026-10-16 — Scan baselines and fingerprints
 Findings get a `fingerprint`: the first 128 bits of SHA-256 over a version label, the rule, the path relative to the scanned folder and the trimmed matched line (or the finding's detail for keys, certificates and dependencies), never the line number, and never secret key bytes. A second identical match in the same file gets a fingerprint derived from the first and its occurrence number. The baseline (`.psionium-scan.toml`, TOML as `design/10` says) matches on fingerprints only, requires a reason for each entry, rejects unknown keys, and is read automatically from the current folder. Accepted findings leave the counts and `--fail-on` but stay in the CBOM (an inventory) and appear in SARIF as suppressions. SARIF leaves out TLS endpoints (code scanning needs a file) and post-quantum findings (inventory, not problems). **Why:** CI must fail only on new findings without breaking on unrelated edits, and typos in a security allowlist must not pass silently. **Revisit:** if users need line-insensitive matching across file renames, or custom rules land in the same file.
 
