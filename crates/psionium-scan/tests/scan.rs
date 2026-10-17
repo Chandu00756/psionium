@@ -693,7 +693,8 @@ fn html_and_sarif_reports() {
     fixture(dir.path());
     write(
         dir.path(),
-        "src/<b>&.go",
+        // Characters that need escaping, all allowed in Windows file names too.
+        "src/a&b c'.go",
         "k, _ := rsa.GenerateKey(rand.Reader, 2048) // <script>\n",
     );
     let mut report = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
@@ -704,7 +705,7 @@ fn html_and_sarif_reports() {
     let html = report.to_html();
     assert!(html.starts_with("<!doctype html>") && html.ends_with("</html>\n"));
     assert!(!html.contains("<script") && !html.contains(" src=") && !html.contains("<link"));
-    assert!(html.contains("src/&lt;b&gt;&amp;.go") && html.contains("reviewed &lt;ok&gt;"));
+    assert!(html.contains("src/a&amp;b c&#39;.go") && html.contains("reviewed &lt;ok&gt;"));
     assert!(html.contains("What to do:") && html.contains("ML-DSA-65 (FIPS 204)"));
     assert!(html.contains("Accepted in the baseline"));
 
@@ -744,7 +745,8 @@ fn html_and_sarif_reports() {
         .unwrap();
     assert_eq!(weak["level"], "error");
     assert!(results.iter().any(
-        |r| r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] == "src/%3Cb%3E%26.go"
+        |r| r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+            == "src/a%26b%20c%27.go"
     ));
     let suppressed: Vec<_> = results
         .iter()

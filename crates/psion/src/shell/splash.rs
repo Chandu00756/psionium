@@ -71,7 +71,7 @@ pub(crate) fn frame(f: &mut Frame, theme: &Theme, depth: Depth, progress: f32) {
         for y in area.top()..area.bottom() {
             for x in area.left()..area.right() {
                 let h = hash(x as u32, y as u32, tick);
-                if h % 23 == 0 {
+                if h.is_multiple_of(23) {
                     let strength = (fade * 255.0) as u8;
                     buf[(x, y)]
                         .set_char(glyphs[(h / 23) as usize % glyphs.len()])

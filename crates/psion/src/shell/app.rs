@@ -285,7 +285,7 @@ impl App {
             .into_iter()
             .filter_map(|(label, a)| fuzzy(query, &label).map(|s| (s, label, a)))
             .collect();
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.sort_by_key(|a| std::cmp::Reverse(a.0));
         scored.into_iter().map(|(_, l, a)| (l, a)).collect()
     }
 
@@ -558,14 +558,16 @@ mod tests {
 
     #[test]
     fn tilde_expands_like_a_shell() {
-        let home = Some(Path::new("/home/ravi"));
+        let ravi = Path::new("/home/ravi");
+        let home = Some(ravi);
+        // Path::join uses the platform's separator, as the shell does when it runs psion.
         assert_eq!(
             expand_arg("~/.psion/me.key".into(), home),
-            "/home/ravi/.psion/me.key"
+            ravi.join(".psion/me.key").display().to_string()
         );
         assert_eq!(
             expand_arg("--sign-with=~/k".into(), home),
-            "--sign-with=/home/ravi/k"
+            format!("--sign-with={}", ravi.join("k").display())
         );
         assert_eq!(expand_arg("a~/b".into(), home), "a~/b");
         assert_eq!(expand_arg("~ravi".into(), home), "~ravi");
