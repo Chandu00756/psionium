@@ -13,17 +13,32 @@ All cryptographic primitives come from [AWS-LC](https://github.com/aws/aws-lc) v
 
 ## Install
 
-On macOS (Apple silicon or Intel) and Linux (x86-64 or ARM64, any distribution):
+On macOS (Apple silicon or Intel), Linux (x86-64 or ARM64, any distribution), and Windows in Git Bash:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Chandu00756/psionium/main/install.sh | sh
 ```
 
-The script downloads the release for your machine, checks it against the release's `SHA256SUMS`, and installs `psion` to `~/.local/bin` (set `PSION_INSTALL_DIR` to change it, `PSION_VERSION=v1.1.0` to pin a version). It needs only `curl` or `wget`.
+The script downloads the release for your machine, checks it against the release's `SHA256SUMS`, and installs `psion` to `~/.local/bin` (`psion.exe` to `~/bin` on Windows; set `PSION_INSTALL_DIR` to change it, `PSION_VERSION=v1.1.0` to pin a version). It needs only `curl` or `wget` (and `unzip` or PowerShell on Windows, both of which Git for Windows has).
 
 To update, run the same command again: it installs the newest release over the old one, after the same checksum check. `psion --version` shows what you have.
 
-On Windows, or to install by hand, download the archive for your platform from the [releases page](https://github.com/Chandu00756/psionium/releases), check it with `sha256sum --check --ignore-missing SHA256SUMS`, and put `psion` on your `PATH`. On macOS, a binary downloaded with a web browser is quarantined; run `xattr -d com.apple.quarantine psion` once to allow it.
+In Windows PowerShell, or to install by hand anywhere, download the archive for your platform and `SHA256SUMS` from the [releases page](https://github.com/Chandu00756/psionium/releases), check the archive, and put `psion` on your `PATH`:
+
+```powershell
+$v = "v1.1.0"; $name = "psion-$v-x86_64-pc-windows-msvc"
+Invoke-WebRequest "https://github.com/Chandu00756/psionium/releases/download/$v/$name.zip" -OutFile "$name.zip"
+Invoke-WebRequest "https://github.com/Chandu00756/psionium/releases/download/$v/SHA256SUMS" -OutFile SHA256SUMS
+(Get-FileHash "$name.zip" -Algorithm SHA256).Hash.ToLower()   # must match the line for $name.zip in SHA256SUMS
+Expand-Archive "$name.zip" -DestinationPath .
+New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\psion" | Out-Null
+Copy-Item "$name\psion.exe" "$env:LOCALAPPDATA\Programs\psion\"
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:LOCALAPPDATA\Programs\psion", "User")
+```
+
+Open a new terminal afterwards. On other systems, `sha256sum --check --ignore-missing SHA256SUMS` checks the download. On macOS, a binary downloaded with a web browser is quarantined; run `xattr -d com.apple.quarantine psion` once to allow it.
+
+On Windows, the full-screen shell and passphrase prompts need a real console: use Windows Terminal or PowerShell. Git Bash's own window (mintty) often does not provide one; there, run `winpty psion`, or `psion --plain`.
 
 To build from source with Rust 1.88 or later:
 

@@ -51,6 +51,8 @@ The shell never stores a passphrase. When an action needs one, it is passed to `
 
 `portal` (default; violet and pink), `classic` (the original pSIONIUM terminal: bold green on black), `high-contrast` and `light`. Colours adapt to the terminal (true colour, 256 or 16 colours). With `NO_COLOR` set, the shell draws without colours, using bold, underline and reverse video instead; no information is shown by colour alone. The shell needs a window of at least 60×16 and is designed for 80×24 and up.
 
+On Windows, use Windows Terminal or PowerShell. Git Bash's own window (mintty) often does not give Windows programs a console, so the full-screen shell cannot start there; run `winpty psion` (winpty comes with Git for Windows), open Git Bash inside Windows Terminal, or use `psion --plain`.
+
 ## Files
 
 Settings are saved in `config.toml` and the prompt history in `history` (readable only by you), in `$PSION_CONFIG_DIR` if set, otherwise `%APPDATA%\psion` on Windows, `$XDG_CONFIG_HOME/psion`, or `~/.config/psion`. Identities created in the shell go to `~/.psion` (created readable only by you).

@@ -323,3 +323,17 @@ fn identities_are_read_without_a_passphrase() {
     let path = Path::new(&me.path);
     assert!(path.ends_with(".psion/me.key"));
 }
+
+#[test]
+fn git_bash_users_are_told_how_to_start_the_shell() {
+    let hint = super::start_failure_hint(true, true);
+    assert!(hint.contains("winpty psion") && hint.contains("psion --plain"));
+    assert_eq!(
+        super::start_failure_hint(false, true),
+        "could not start the full-screen shell"
+    );
+    assert_eq!(
+        super::start_failure_hint(true, false),
+        "could not start the full-screen shell"
+    );
+}

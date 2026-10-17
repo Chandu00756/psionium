@@ -2,6 +2,22 @@
 
 Newest first. Every session adds one entry: date, who, what was done, how it was verified, what is left.
 
+## 2026-10-16 — Claude (Opus 5.5): Windows install via Git Bash
+
+**Done**
+- The owner ran the `install.sh` one-liner in Git Bash on Windows: it stopped with "no build for MINGW64_NT-10.0-26300", because the script only knew Linux and macOS.
+- `install.sh`: `MINGW*`, `MSYS*`, `CYGWIN*` download the Windows `.zip`, check it against `SHA256SUMS`, unpack with `unzip` (or PowerShell `Expand-Archive`), and install `psion.exe` to `~/bin` (on Git Bash's PATH). Windows on ARM gets the x86-64 build.
+- The shell explains what to do when it cannot take over Git Bash's terminal (mintty): `winpty psion`, Windows Terminal, PowerShell or `--plain`. Ships in the next release.
+- README: Git Bash one-liner, PowerShell steps, the mintty note; `docs/shell.md`; CHANGELOG "Unreleased".
+
+**Verified**
+- Against the real v1.1.0 release with a `uname` shim reporting `MINGW64_NT-10.0-26300`: the installed `psion.exe` is byte-identical to the release's (PE32+ x86-64); ARM reports get x86-64; without `unzip` or PowerShell it stops with a clear message and installs nothing; pinned `PSION_VERSION` and `PSION_INSTALL_DIR` work. Regressions: macOS and Alpine Linux (busybox wget) still install v1.1.0.
+- Not verified: running on a real Windows machine (no Windows here), the PowerShell steps (no PowerShell here), and how Git Bash's mintty behaves with the full-screen shell on the owner's machine.
+
+**Left / next agent**
+- Ask the owner to rerun the one-liner in Git Bash once this is pushed, and to try `psion` in Windows Terminal or with `winpty`.
+- Consider an `install.ps1` (needs a Windows or PowerShell test environment) and a Windows CI job that runs `install.sh` in Git Bash.
+
 ## 2026-10-16 — Claude (Opus 5.5): v1.1.0 released
 
 **Done**

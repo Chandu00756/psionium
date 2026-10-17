@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `install.sh` installs on Windows in Git Bash, MSYS2 and Cygwin (`psion.exe` to `~/bin`), with the same checksum check. The README shows the PowerShell steps.
+- When the full-screen shell cannot start in Git Bash or MSYS2, the error says what to do (`winpty psion`, Windows Terminal, PowerShell or `psion --plain`).
+
 ## 1.1.0 (2026-10-16)
 
 ### The pSIONIUM shell

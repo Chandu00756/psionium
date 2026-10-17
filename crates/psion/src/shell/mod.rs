@@ -65,6 +65,19 @@ pub(crate) fn theme_command(name: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+/// Why the full screen could not start, with what to do about it in Git Bash and MSYS2, whose
+/// default terminal (mintty) does not give Windows programs a console.
+pub(crate) fn start_failure_hint(windows: bool, msys: bool) -> String {
+    let mut msg = "could not start the full-screen shell".to_string();
+    if windows && msys {
+        msg.push_str(
+            "; Git Bash's terminal does not give Windows programs a console. Run `winpty psion`, \
+             open Git Bash in Windows Terminal, use PowerShell, or run `psion --plain`",
+        );
+    }
+    msg
+}
+
 /// Opens the shell.
 pub(crate) fn run(args: ShellArgs) -> Result<()> {
     let config_dir = config::config_dir();
@@ -99,7 +112,16 @@ pub(crate) fn run(args: ShellArgs) -> Result<()> {
     let mut app = App::new(env, config, history);
     app.theme = Theme::new(&theme_name, depth, app.env.no_color);
 
-    let mut terminal = ratatui::try_init().context("could not start the full-screen shell")?;
+    let mut terminal = match ratatui::try_init() {
+        Ok(t) => t,
+        Err(e) => {
+            ratatui::restore();
+            return Err(anyhow::Error::new(e)).context(start_failure_hint(
+                cfg!(windows),
+                std::env::var_os("MSYSTEM").is_some(),
+            ));
+        }
+    };
     let _ = execute!(io::stdout(), EnableBracketedPaste);
     let result = (|| -> Result<()> {
         let size = terminal.size()?;
