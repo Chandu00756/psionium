@@ -5,7 +5,7 @@ Post-quantum protection for the data you keep. `psion` encrypts and signs files 
 - **Encrypt** to one or more people with hybrid X25519 + ML-KEM-768 (FIPS 203), or ML-KEM-1024 for CNSA 2.0. AES-256-GCM in authenticated chunks streams files of any size in a few MB of memory.
 - **Sign** with ML-DSA (FIPS 204) so recipients can prove who sent a file.
 - **Protect keys** with a passphrase (Argon2id) by default.
-- **Scan** source code, dependencies, certificates, SSH keys and live TLS servers for RSA, elliptic curves, Diffie-Hellman and DSA, and export a CycloneDX 1.6 CBOM.
+- **Scan** source code, dependencies, certificates, SSH keys and live TLS servers for RSA, elliptic curves, Diffie-Hellman and DSA; export a CycloneDX 1.6 CBOM, an HTML report or SARIF for code scanning, and keep a baseline so CI fails only on new findings.
 
 All cryptographic primitives come from [AWS-LC](https://github.com/aws/aws-lc) via `aws-lc-rs`, except Argon2id passphrase hashing, which comes from RustCrypto's [`argon2`](https://crates.io/crates/argon2). pSIONIUM's own crates contain no `unsafe` code.
 
@@ -55,7 +55,7 @@ psion scan ./my-app --tls api.example.com
 | `psion decrypt -i IDENTITY [--signed-by KEY…] [-o OUT] [INPUT]` | Decrypts and reports the signature. With `--signed-by`, unsigned files and other signers are refused. |
 | `psion inspect FILE` | Shows a file's suite, chunk size, recipients and signer without decrypting. |
 | `psion passphrase -i IDENTITY [--remove]` | Adds, changes or removes an identity's passphrase. |
-| `psion scan [PATH…] [--tls HOST[:PORT]…] [--format text\|markdown\|json\|cbom] [--fail-on quantum-vulnerable\|weak]` | Quantum-readiness scan. Exit status 2 with `--fail-on` when matching findings exist. |
+| `psion scan [PATH…] [--tls HOST[:PORT]…] [--format text\|markdown\|html\|json\|sarif\|cbom] [--fail-on quantum-vulnerable\|weak] [--baseline FILE] [--no-excerpts]` | Quantum-readiness scan. Exit status 2 with `--fail-on` when new findings (not accepted in the baseline) match. |
 
 For scripts, `--passphrase-file FILE` reads a passphrase from the first line of a file instead of prompting, and `-` as a file name means standard input or output.
 

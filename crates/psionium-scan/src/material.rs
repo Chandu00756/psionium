@@ -7,7 +7,7 @@ use x509_parser::prelude::*;
 use x509_parser::public_key::PublicKey;
 
 use crate::model::{Category, CertificateInfo, Finding, Primitive, Source};
-use crate::util::date;
+use crate::util::{date, fingerprint};
 
 /// Looks for PEM blocks and SSH public keys in a text file.
 pub(crate) fn scan_text(path: &str, text: &str, findings: &mut Vec<Finding>) {
@@ -127,13 +127,18 @@ pub(crate) fn certificate_finding(
         source,
         location: location.to_string(),
         line,
+        fingerprint: fingerprint("certificate", location, &detail),
         detail,
         rule: "certificate".into(),
+        root: 0,
     }
 }
 
 fn private_key(path: &str, line: usize, algorithm: &str, primitive: Primitive) -> Finding {
     let pq = is_pq_name(algorithm);
+    let detail = format!(
+        "{algorithm} private key stored in the scanned files; move it to a secrets manager and rotate it"
+    );
     Finding {
         category: if pq {
             Category::QuantumSafe
@@ -146,15 +151,19 @@ fn private_key(path: &str, line: usize, algorithm: &str, primitive: Primitive) -
         source: Source::PrivateKey,
         location: path.to_string(),
         line: Some(line),
-        detail: format!(
-            "{algorithm} private key stored in the scanned files; move it to a secrets manager and rotate it"
-        ),
+        fingerprint: fingerprint("private-key", path, &detail),
+        detail,
         rule: "private-key".into(),
+        root: 0,
     }
 }
 
 fn public_key(path: &str, line: usize, algorithm: &str, bits: Option<usize>) -> Finding {
     let pq = is_pq_name(algorithm);
+    let detail = match bits {
+        Some(b) => format!("{algorithm}-{b} public key"),
+        None => format!("{algorithm} public key"),
+    };
     Finding {
         category: if pq {
             Category::QuantumSafe
@@ -167,11 +176,10 @@ fn public_key(path: &str, line: usize, algorithm: &str, bits: Option<usize>) -> 
         source: Source::PublicKey,
         location: path.to_string(),
         line: Some(line),
-        detail: match bits {
-            Some(b) => format!("{algorithm}-{b} public key"),
-            None => format!("{algorithm} public key"),
-        },
+        fingerprint: fingerprint("public-key", path, &detail),
+        detail,
         rule: "public-key".into(),
+        root: 0,
     }
 }
 

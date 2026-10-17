@@ -484,3 +484,123 @@ fn scan_reports_and_fails_on_request() {
         .failure()
         .stderr(predicate::str::contains("does not exist"));
 }
+
+#[test]
+fn scan_baselines_and_report_formats() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir_all(root.join("docs")).unwrap();
+    fs::write(
+        root.join("src/keys.go"),
+        "k, _ := rsa.GenerateKey(rand.Reader, 2048)\nh := md5.Sum(b)\n",
+    )
+    .unwrap();
+    fs::write(root.join("docs/notes.go"), "x := ecdsa.Sign(r, k, d)\n").unwrap();
+
+    // HTML and SARIF reports, without code excerpts.
+    let html = psion()
+        .current_dir(root)
+        .args(["scan", "--format", "html", "--no-excerpts"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let html = String::from_utf8(html).unwrap();
+    assert!(html.starts_with("<!doctype html>") && !html.contains("GenerateKey"));
+    let sarif = psion()
+        .current_dir(root)
+        .args(["scan", "--format", "sarif"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let sarif: serde_json::Value = serde_json::from_slice(&sarif).unwrap();
+    let results = sarif["runs"][0]["results"].as_array().unwrap();
+    assert!(results.iter().any(|r| {
+        r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] == "src/keys.go"
+            && r["locations"][0]["physicalLocation"]["region"]["startLine"] == 1
+    }));
+
+    // Accept everything known, then only new findings fail.
+    psion()
+        .current_dir(root)
+        .args([
+            "scan",
+            "--write-baseline",
+            ".psionium-scan.toml",
+            "--fail-on",
+            "weak",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("3 findings accepted"));
+    let written = fs::read_to_string(root.join(".psionium-scan.toml")).unwrap();
+    assert!(written.starts_with("# pSIONIUM Scan baseline."));
+    assert!(written.contains("location = \"src/keys.go:1\""));
+    psion()
+        .current_dir(root)
+        .args(["scan", "--fail-on", "weak"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "Using baseline .psionium-scan.toml",
+        ));
+    psion()
+        .current_dir(root)
+        .args(["scan", "--no-baseline", "--fail-on", "weak"])
+        .assert()
+        .code(2);
+
+    // Ignoring docs/ leaves its entry stale; a new line still fails.
+    fs::write(
+        root.join(".psionium-scan.toml"),
+        written.replace("ignore = []", "ignore = [\"docs/\"]"),
+    )
+    .unwrap();
+    fs::write(
+        root.join("src/keys.go"),
+        "// moved\nk, _ := rsa.GenerateKey(rand.Reader, 2048)\nh := md5.Sum(b)\nk2, _ := rsa.GenerateKey(rand.Reader, 4096)\n",
+    )
+    .unwrap();
+    psion()
+        .current_dir(root)
+        .args(["scan", "--fail-on", "quantum-vulnerable"])
+        .assert()
+        .code(2)
+        .stdout(predicate::str::contains("src/keys.go:4"))
+        .stdout(predicate::str::contains("src/keys.go:2").not())
+        .stderr(predicate::str::contains(
+            "1 entry in the baseline no longer matches",
+        ))
+        .stderr(predicate::str::contains("1 finding matched --fail-on"));
+
+    // An explicit baseline elsewhere, and a broken one.
+    let elsewhere = root.join("ci-baseline.toml");
+    fs::rename(root.join(".psionium-scan.toml"), &elsewhere).unwrap();
+    psion()
+        .current_dir(root)
+        .args(["scan", "--fail-on", "quantum-vulnerable", "--baseline"])
+        .arg(&elsewhere)
+        .assert()
+        .code(2);
+    fs::write(
+        &elsewhere,
+        "[[accepted]]\nfingerprint = \"xyz\"\nreason = \"r\"\n",
+    )
+    .unwrap();
+    psion()
+        .current_dir(root)
+        .args(["scan", "--baseline"])
+        .arg(&elsewhere)
+        .assert()
+        .code(1)
+        .stderr(predicate::str::contains("is not a valid baseline"));
+    psion()
+        .current_dir(root)
+        .args(["scan", "--baseline", "x.toml", "--no-baseline"])
+        .assert()
+        .failure();
+}

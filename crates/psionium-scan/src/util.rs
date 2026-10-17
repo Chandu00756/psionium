@@ -1,3 +1,32 @@
+use std::collections::HashMap;
+
+use aws_lc_rs::digest::{SHA256, digest};
+
+use crate::model::Finding;
+
+/// A finding's fingerprint: the first 128 bits of SHA-256 over the rule, the location and what
+/// matched, in hex.
+pub(crate) fn fingerprint(rule: &str, location: &str, content: &str) -> String {
+    let input = format!("psionium-scan/v1\0{rule}\0{location}\0{}", content.trim());
+    digest(&SHA256, input.as_bytes()).as_ref()[..16]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// Gives findings that share a fingerprint (the same match twice in one file) distinct ones,
+/// numbered in report order, so a baseline can accept one without the other. Idempotent.
+pub(crate) fn disambiguate(findings: &mut [Finding]) {
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    for f in findings.iter_mut() {
+        let n = seen.entry(f.fingerprint.clone()).or_insert(0);
+        if *n > 0 {
+            f.fingerprint = fingerprint("occurrence", &f.fingerprint, &n.to_string());
+        }
+        *n += 1;
+    }
+}
+
 /// A Unix timestamp as a `YYYY-MM-DD` UTC date.
 pub(crate) fn date(timestamp: i64) -> String {
     let (y, m, d) = civil(timestamp.div_euclid(86_400));

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### psion scan
+
+- `--format html`: a self-contained report (no scripts or network requests) with a summary, NIST deadlines, a chart of algorithms, and what to do about each finding.
+- `--format sarif`: SARIF 2.1.0 for GitHub code scanning; accepted findings carry suppressions.
+- Baselines: `.psionium-scan.toml` lists accepted findings (each with a reason) and paths to `ignore`; `--fail-on` then fails only on new findings. Read automatically from the current folder, or with `--baseline FILE`; `--no-baseline` skips it; `--write-baseline FILE` accepts what is found and keeps reasons already written.
+- `--no-excerpts`: reports never quote source code.
+- Every finding has a `fingerprint` (in JSON and SARIF) that survives edits elsewhere in the file.
+
 ## 1.0.0 (2026-10-16)
 
 First release of pSIONIUM 3.

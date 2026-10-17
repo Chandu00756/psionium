@@ -1,6 +1,6 @@
 # Where pSIONIUM stands
 
-Last updated: 2026-10-16, after the `v1.0.0` release (commit `1aa8086`). Every agent updates this file at the end of its work (see `README.md`).
+Last updated: 2026-10-16, Stage 2 started: Scan HTML/SARIF/baseline built on top of `3b54d17`. Every agent updates this file at the end of its work (see `README.md`).
 
 ## Summary
 
@@ -16,6 +16,7 @@ The full platform the owner wants (interactive shell, accounts, secure transfer,
 | `psionium-core` (Rust) | Encryption to many recipients (X25519 + ML-KEM-768, or ML-KEM-1024), ML-DSA signatures, Argon2id-protected identities, streaming AES-256-GCM chunks | 17 round-trip, 4 passphrase, 3 mutation, 2 vector tests; 2.4 million random file corruptions, none accepted |
 | `psion` CLI | keygen, pubkey, encrypt, decrypt (`--signed-by`), inspect, passphrase, scan; `-` for stdin/stdout; atomic outputs | 8 end-to-end CLI tests |
 | `psionium-scan` | Finds quantum-vulnerable crypto in code (40+ languages/formats), dependency manifests, certificates, keys, live TLS (X25519MLKEM768 check); text, Markdown, JSON, CycloneDX 1.6 CBOM; `--fail-on` for CI | 5 tests incl. live local TLS servers; real scans of TaskFlow |
+| Scan Stage A | `--format html` (self-contained report), `--format sarif` (2.1.0), baseline `.psionium-scan.toml` (accepted findings with reasons, `ignore` paths; `--baseline`, `--no-baseline`, `--write-baseline`), `--no-excerpts`, a `fingerprint` on every finding | 5 new scanner tests, 1 new CLI test; HTML checked in a browser (dark, light, 375 px wide, no overflow); full suite green (see `LOG.md`) |
 | CI (`.github/workflows/ci.yml`) | lint, tests on Linux/macOS/Windows, MSRV 1.88, `cargo audit`, Go interop; every job has a timeout | Green on `14bd645` (run 38943173387): all 42 tests pass on Linux, macOS and Windows. An earlier Windows hang (the passphrase prompt waited on the console) is fixed |
 | Release (`.github/workflows/release.yml`) | On a `v*` tag: builds Linux musl (x86-64, ARM64), macOS (arm64, x86-64), Windows; SHA256SUMS; provenance attestations when the repo is public. Can run by hand (`gh workflow run release.yml`) to test builds without publishing | v1.0.0 published by run 38944493682. Downloaded assets match SHA256SUMS; every binary prints `psion 1.0.0` (macOS arm64 native, x86-64 under Rosetta, Linux arm64 and x86-64 in Alpine); files made by the released macOS binary decrypt with the released Linux binary. No provenance attestations yet (private repo) |
 | `install.sh` | Detects OS/CPU, downloads the release, checks SHA-256, installs to `~/.local/bin`; curl or wget | Tested on macOS and a clean Alpine container against a local copy of the release layout; tampered archive refused |
@@ -40,7 +41,7 @@ All open owner decisions and actions are tracked in [`design/14-owner-decisions.
 
 ## Known gaps (not blocking 1.0 CLI, needed for the vision)
 
-- No GitHub Action wrapper or hosted HTML report for Scan yet.
+- No GitHub Action wrapper, Docker image or GitLab template for Scan yet (HTML report and SARIF exist). No custom rules in the baseline.
 - No `cargo-fuzz` targets (mutation tests cover parsing today); no benchmarks published.
 - SLH-DSA (long-term signatures) not implemented.
 - No Vault service, apps, SDKs, key hierarchy, recovery or audit log yet.

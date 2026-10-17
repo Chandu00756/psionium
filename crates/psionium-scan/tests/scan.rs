@@ -7,7 +7,9 @@ use std::time::Duration;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use psionium_scan::{Category, Finding, ScanOptions, Source, empty_report, probe_tls, scan_paths};
+use psionium_scan::{
+    Baseline, Category, Finding, ScanOptions, Source, empty_report, probe_tls, scan_paths,
+};
 use rustls::crypto::{CryptoProvider, aws_lc_rs};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 
@@ -446,4 +448,311 @@ fn tls_probe_detects_post_quantum_support() {
     assert!(report.tls.len() == 1);
     let unreachable = probe_tls("127.0.0.1:1", Duration::from_secs(2), &[]);
     assert!(!unreachable.reachable && unreachable.error.is_some());
+}
+
+#[test]
+fn fingerprints_survive_edits_and_tell_duplicates_apart() {
+    let dir = tempfile::tempdir().unwrap();
+    fixture(dir.path());
+    let before = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
+    let mut all: Vec<&str> = before
+        .findings
+        .iter()
+        .map(|f| f.fingerprint.as_str())
+        .collect();
+    assert!(all.iter().all(|fp| {
+        fp.len() == 32
+            && fp
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    }));
+    let total = all.len();
+    all.sort_unstable();
+    all.dedup();
+    assert_eq!(all.len(), total, "fingerprints are unique");
+
+    // Lines moving down keep their fingerprints; an identical copy of a line gets a new one.
+    let auth = dir.path().join("src/auth.go");
+    let text = fs::read_to_string(&auth).unwrap();
+    fs::write(
+        &auth,
+        format!("// moved\n// down\n{text}\th2 := md5.Sum(data)\n\th := md5.Sum(data)\n"),
+    )
+    .unwrap();
+    let after = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
+    let in_auth = |r: &psionium_scan::Report| -> Vec<(String, usize)> {
+        r.findings
+            .iter()
+            .filter(|f| f.location == "src/auth.go")
+            .map(|f| (f.fingerprint.clone(), f.line.unwrap()))
+            .collect()
+    };
+    let (old, new) = (in_auth(&before), in_auth(&after));
+    for (fp, line) in &old {
+        assert!(
+            new.contains(&(fp.clone(), line + 2)),
+            "{fp} moved with its line"
+        );
+    }
+    assert_eq!(new.len(), old.len() + 2);
+    let md5: Vec<_> = after
+        .findings
+        .iter()
+        .filter(|f| f.location == "src/auth.go" && f.algorithm == "MD5")
+        .map(|f| f.fingerprint.clone())
+        .collect();
+    assert_eq!(md5.len(), 3);
+    assert!(
+        md5[0] != md5[2],
+        "a duplicate line gets its own fingerprint"
+    );
+}
+
+#[test]
+fn excerpts_can_be_left_out() {
+    let dir = tempfile::tempdir().unwrap();
+    fixture(dir.path());
+    let with = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
+    let without = scan_paths(
+        &[dir.path()],
+        &ScanOptions {
+            excerpts: false,
+            ..ScanOptions::default()
+        },
+    )
+    .unwrap();
+    for format in [
+        without.to_json(),
+        without.to_markdown(),
+        without.to_html(),
+        without.to_sarif(),
+        without.to_cbom(),
+        without.to_text(),
+    ] {
+        assert!(!format.contains("GenerateKey") && !format.contains("SignASN1"));
+    }
+    assert!(with.to_json().contains("GenerateKey"));
+    let fps = |r: &psionium_scan::Report| {
+        let mut v: Vec<String> = r.findings.iter().map(|f| f.fingerprint.clone()).collect();
+        v.sort();
+        v
+    };
+    assert_eq!(
+        fps(&with),
+        fps(&without),
+        "fingerprints do not depend on excerpts"
+    );
+}
+
+#[test]
+fn ignore_patterns_skip_paths() {
+    let dir = tempfile::tempdir().unwrap();
+    fixture(dir.path());
+    let report = scan_paths(
+        &[dir.path()],
+        &ScanOptions {
+            ignore: vec!["app/".into(), "*.pem".into(), "deploy/**".into()],
+            ..ScanOptions::default()
+        },
+    )
+    .unwrap();
+    let f = &report.findings;
+    assert!(f.iter().all(|f| !f.location.starts_with("app/")
+        && !f.location.ends_with(".pem")
+        && !f.location.starts_with("deploy/")));
+    assert!(!find(f, "src/auth.go", "RSA").is_empty());
+    assert!(
+        f.iter().any(|f| f.location == "certs/server.key"),
+        "only .pem files were ignored"
+    );
+
+    assert!(
+        scan_paths(
+            &[dir.path()],
+            &ScanOptions {
+                ignore: vec!["src/{a,b".into()],
+                ..ScanOptions::default()
+            },
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn baselines_accept_known_findings_and_keep_reasons() {
+    let dir = tempfile::tempdir().unwrap();
+    fixture(dir.path());
+    // The baseline file itself is never scanned, though it names algorithms.
+    fs::write(
+        dir.path().join(psionium_scan::BASELINE_FILE),
+        "# RSA ECDSA md5\n",
+    )
+    .unwrap();
+    let first = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
+    assert!(
+        first
+            .findings
+            .iter()
+            .all(|f| f.location != psionium_scan::BASELINE_FILE)
+    );
+    let baseline = Baseline::accepting(&first, None, "known");
+    assert!(
+        baseline
+            .accepted
+            .iter()
+            .all(|a| a.reason == "known" && !a.location.is_empty())
+    );
+    let parsed = Baseline::parse(&baseline.to_toml()).unwrap();
+    assert_eq!(parsed, baseline);
+
+    // Everything known is accepted; only post-quantum findings remain.
+    let mut again = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
+    assert!(again.apply_baseline(&parsed).is_empty());
+    assert!(
+        again
+            .findings
+            .iter()
+            .all(|f| f.category == Category::QuantumSafe)
+    );
+    assert_eq!(again.accepted.len(), baseline.accepted.len());
+    assert_eq!(again.counts().get(&Category::QuantumVulnerable), None);
+    assert!(again.to_text().contains("Accepted in the baseline"));
+    let cbom: serde_json::Value = serde_json::from_str(&again.to_cbom()).unwrap();
+    assert!(
+        cbom["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == "RSA"),
+        "the CBOM still lists accepted cryptography"
+    );
+
+    // A new finding is not accepted; a fixed one leaves a stale entry.
+    write(
+        dir.path(),
+        "src/auth.go",
+        "package auth\nfunc keys() {\n\tk, _ := rsa.GenerateKey(rand.Reader, 4096)\n}\n",
+    );
+    let mut edited = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
+    let stale = edited.apply_baseline(&parsed);
+    assert!(!stale.is_empty());
+    let new: Vec<_> = edited
+        .findings
+        .iter()
+        .filter(|f| f.category != Category::QuantumSafe)
+        .collect();
+    assert_eq!(new.len(), 1);
+    assert_eq!((new[0].algorithm.as_str(), new[0].line), ("RSA", Some(3)));
+
+    // Rewriting keeps reasons, drops stale entries and adds new ones.
+    let mut custom = parsed.clone();
+    custom.ignore = vec!["docs/".into()];
+    let kept = custom
+        .accepted
+        .iter_mut()
+        .find(|a| a.location.starts_with("app/crypto.py"))
+        .unwrap();
+    kept.reason = "Python service retires in Q2".into();
+    let kept_fp = kept.fingerprint.clone();
+    let mut edited = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
+    edited.apply_baseline(&custom);
+    let rewritten = Baseline::accepting(&edited, Some(&custom), "new");
+    assert_eq!(rewritten.ignore, vec!["docs/".to_string()]);
+    let reason = |fp: &str| {
+        rewritten
+            .accepted
+            .iter()
+            .find(|a| a.fingerprint == fp)
+            .map(|a| a.reason.clone())
+    };
+    assert_eq!(
+        reason(&kept_fp).as_deref(),
+        Some("Python service retires in Q2")
+    );
+    assert_eq!(reason(&new[0].fingerprint).as_deref(), Some("new"));
+    assert_eq!(
+        rewritten.accepted.len(),
+        baseline.accepted.len() - stale.len() + 1
+    );
+
+    // Bad baselines are rejected with a reason.
+    for bad in [
+        "ignroe = []\n",
+        "[[accepted]]\nfingerprint = \"abc\"\nreason = \"x\"\n",
+        "[[accepted]]\nfingerprint = \"0123456789abcdef0123456789abcdef\"\nreason = \" \"\n",
+        "[[accepted]]\nreason = \"x\"\n",
+    ] {
+        assert!(Baseline::parse(bad).is_err(), "{bad}");
+    }
+    assert_eq!(Baseline::parse("").unwrap(), Baseline::default());
+}
+
+#[test]
+fn html_and_sarif_reports() {
+    let dir = tempfile::tempdir().unwrap();
+    fixture(dir.path());
+    write(
+        dir.path(),
+        "src/<b>&.go",
+        "k, _ := rsa.GenerateKey(rand.Reader, 2048) // <script>\n",
+    );
+    let mut report = scan_paths(&[dir.path()], &ScanOptions::default()).unwrap();
+    let mut accept = Baseline::accepting(&report, None, "reviewed <ok>");
+    accept.accepted.retain(|a| a.location.starts_with("app/"));
+    report.apply_baseline(&accept);
+
+    let html = report.to_html();
+    assert!(html.starts_with("<!doctype html>") && html.ends_with("</html>\n"));
+    assert!(!html.contains("<script") && !html.contains(" src=") && !html.contains("<link"));
+    assert!(html.contains("src/&lt;b&gt;&amp;.go") && html.contains("reviewed &lt;ok&gt;"));
+    assert!(html.contains("What to do:") && html.contains("ML-DSA-65 (FIPS 204)"));
+    assert!(html.contains("Accepted in the baseline"));
+
+    let sarif: serde_json::Value = serde_json::from_str(&report.to_sarif()).unwrap();
+    assert_eq!(sarif["version"], "2.1.0");
+    let run = &sarif["runs"][0];
+    let rules = run["tool"]["driver"]["rules"].as_array().unwrap();
+    let results = run["results"].as_array().unwrap();
+    assert!(!results.is_empty());
+    for r in results {
+        let rule = &rules[r["ruleIndex"].as_u64().unwrap() as usize];
+        assert_eq!(rule["id"], r["ruleId"]);
+        assert_ne!(r["properties"]["category"], "quantum-safe");
+        assert_eq!(
+            r["partialFingerprints"]["psioniumFingerprint/v1"]
+                .as_str()
+                .unwrap()
+                .len(),
+            32
+        );
+        let location = &r["locations"][0]["physicalLocation"]["artifactLocation"];
+        assert_eq!(
+            location["uriBaseId"], "SCANROOT0",
+            "absolute roots use a base id"
+        );
+        assert!(!location["uri"].as_str().unwrap().starts_with('/'));
+    }
+    assert!(
+        run["originalUriBaseIds"]["SCANROOT0"]["uri"]
+            .as_str()
+            .unwrap()
+            .starts_with("file:///")
+    );
+    let weak = results
+        .iter()
+        .find(|r| r["properties"]["algorithm"] == "MD5")
+        .unwrap();
+    assert_eq!(weak["level"], "error");
+    assert!(results.iter().any(
+        |r| r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] == "src/%3Cb%3E%26.go"
+    ));
+    let suppressed: Vec<_> = results
+        .iter()
+        .filter(|r| r.get("suppressions").is_some())
+        .collect();
+    assert_eq!(suppressed.len(), report.accepted.len());
+    assert_eq!(
+        suppressed[0]["suppressions"][0]["justification"],
+        "reviewed <ok>"
+    );
 }

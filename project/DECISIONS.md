@@ -2,6 +2,9 @@
 
 Newest first. Each entry: the decision, why, and what would make us revisit it.
 
+## 2026-10-16 — Scan baselines and fingerprints
+Findings get a `fingerprint`: the first 128 bits of SHA-256 over a version label, the rule, the path relative to the scanned folder and the trimmed matched line (or the finding's detail for keys, certificates and dependencies), never the line number, and never secret key bytes. A second identical match in the same file gets a fingerprint derived from the first and its occurrence number. The baseline (`.psionium-scan.toml`, TOML as `design/10` says) matches on fingerprints only, requires a reason for each entry, rejects unknown keys, and is read automatically from the current folder. Accepted findings leave the counts and `--fail-on` but stay in the CBOM (an inventory) and appear in SARIF as suppressions. SARIF leaves out TLS endpoints (code scanning needs a file) and post-quantum findings (inventory, not problems). **Why:** CI must fail only on new findings without breaking on unrelated edits, and typos in a security allowlist must not pass silently. **Revisit:** if users need line-insensitive matching across file renames, or custom rules land in the same file.
+
 ## 2026-10-16 — Platform design adopted (owner request)
 The owner asked for the full business platform to be designed end to end before more building: interactive shell, accounts, secure transfer, web and apps, licensing, admin, back office. The design is `project/design/` (01–14). **Why:** so any agent builds the same thing in the same order. **Revisit:** through the change process in `design/README.md`.
 

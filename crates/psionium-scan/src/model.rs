@@ -122,6 +122,13 @@ pub struct Finding {
     pub detail: String,
     /// The rule that produced the finding.
     pub rule: String,
+    /// Identifies the finding across scans: a hash of the rule, the location and what matched,
+    /// but not the line number, so it survives edits elsewhere in the file. Baselines and SARIF
+    /// use it.
+    pub fingerprint: String,
+    /// Index into [`crate::Report::roots`] of the path this was found under.
+    #[serde(skip)]
+    pub root: usize,
 }
 
 /// The result of probing one TLS endpoint.

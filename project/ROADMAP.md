@@ -24,7 +24,8 @@ Interactive CLI (`design/05-interactive-cli.md`):
 - [ ] `psion doctor`, `psion completions`, `psion update` (signature-checked self-update)
 - [ ] Snapshot tests per screen and theme at 80×24 and 200×60; scripting-mode compatibility tests unchanged
 Scan (`design/10-scan-product.md` Stage A):
-- [ ] `--format html` report; SARIF output; baseline file; `--no-excerpts`
+- [x] `--format html` report; SARIF output; baseline file; `--no-excerpts` (2026-10-16; finding fingerprints added for baselines and SARIF)
+- [ ] Custom rules in the baseline file (`design/10` Stage A; not built yet)
 - [ ] GitHub Action `psionium/scan-action@v1`, Docker image, GitLab template
 Core hardening (`design/12-quality-security-ops.md`):
 - [ ] `cargo-fuzz` targets; benchmarks published; SLH-DSA option for long-term signatures

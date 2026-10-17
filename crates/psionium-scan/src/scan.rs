@@ -6,11 +6,13 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 use ignore::WalkBuilder;
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use regex::Regex;
 
 use crate::material;
 use crate::model::{Finding, Source};
 use crate::rules::{CODE_RULES, DEPENDENCY_RULES, is_code_file, is_lock_file};
+use crate::util::fingerprint;
 
 /// Options for [`crate::scan_paths`].
 #[derive(Clone, Debug)]
@@ -19,6 +21,12 @@ pub struct ScanOptions {
     pub include_dependencies: bool,
     /// Skip files larger than this many bytes.
     pub max_file_size: u64,
+    /// Include the matching part of each line of code in findings. When false, code findings
+    /// name the rule instead, so reports never contain source code.
+    pub excerpts: bool,
+    /// Paths to skip, as `.gitignore`-style patterns relative to each scanned folder (for
+    /// example `docs/`, `**/testdata/**` or `*.pem`).
+    pub ignore: Vec<String>,
 }
 
 impl Default for ScanOptions {
@@ -26,8 +34,29 @@ impl Default for ScanOptions {
         ScanOptions {
             include_dependencies: false,
             max_file_size: 4 * 1024 * 1024,
+            excerpts: true,
+            ignore: Vec::new(),
         }
     }
+}
+
+/// The baseline file's name; the scanner never reports on it.
+pub const BASELINE_FILE: &str = ".psionium-scan.toml";
+
+/// Builds the matcher for [`ScanOptions::ignore`] under one scanned path.
+pub(crate) fn ignore_matcher(root: &Path, patterns: &[String]) -> Result<Gitignore, String> {
+    let base = if root.is_file() {
+        root.parent().unwrap_or(root)
+    } else {
+        root
+    };
+    let mut builder = GitignoreBuilder::new(base);
+    for pattern in patterns {
+        builder
+            .add_line(None, pattern)
+            .map_err(|e| format!("ignore pattern \"{pattern}\": {e}"))?;
+    }
+    builder.build().map_err(|e| format!("ignore patterns: {e}"))
 }
 
 /// Counts of what the walk saw.
@@ -65,6 +94,7 @@ const DEPENDENCY_DIRS: &[&str] = &[
 pub(crate) fn walk(
     root: &Path,
     options: &ScanOptions,
+    ignored: Gitignore,
     findings: &mut Vec<Finding>,
     stats: &mut WalkStats,
 ) {
@@ -77,6 +107,9 @@ pub(crate) fn walk(
         .filter_entry(move |e| {
             let name = e.file_name().to_string_lossy();
             let is_dir = e.file_type().is_some_and(|t| t.is_dir());
+            if e.depth() > 0 && ignored.matched(e.path(), is_dir).is_ignore() {
+                return false;
+            }
             !(is_dir
                 && (ALWAYS_SKIP.contains(&name.as_ref())
                     || (!include_deps && DEPENDENCY_DIRS.contains(&name.as_ref()))))
@@ -87,6 +120,9 @@ pub(crate) fn walk(
             continue;
         }
         let path = entry.path();
+        if entry.file_name() == BASELINE_FILE {
+            continue;
+        }
         let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
         if size > options.max_file_size {
             stats.skipped += 1;
@@ -98,7 +134,7 @@ pub(crate) fn walk(
         };
         stats.scanned += 1;
         let display = display_path(root, path);
-        scan_file(&display, path, &bytes, findings);
+        scan_file(&display, path, &bytes, options.excerpts, findings);
     }
 }
 
@@ -116,7 +152,13 @@ fn display_path(root: &Path, path: &Path) -> String {
     }
 }
 
-pub(crate) fn scan_file(display: &str, path: &Path, bytes: &[u8], findings: &mut Vec<Finding>) {
+pub(crate) fn scan_file(
+    display: &str,
+    path: &Path,
+    bytes: &[u8],
+    excerpts: bool,
+    findings: &mut Vec<Finding>,
+) {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -142,11 +184,11 @@ pub(crate) fn scan_file(display: &str, path: &Path, bytes: &[u8], findings: &mut
     material::scan_text(display, &text, findings);
     dependencies(display, &name, &text, findings);
     if is_code_file(&name) && !is_lock_file(&name) {
-        code(display, &text, findings);
+        code(display, &text, excerpts, findings);
     }
 }
 
-fn code(display: &str, text: &str, findings: &mut Vec<Finding>) {
+fn code(display: &str, text: &str, excerpts: bool, findings: &mut Vec<Finding>) {
     for (i, line) in text.lines().enumerate() {
         if line.len() > 4000 {
             continue; // minified or generated
@@ -169,8 +211,14 @@ fn code(display: &str, text: &str, findings: &mut Vec<Finding>) {
                 source: Source::Code,
                 location: display.to_string(),
                 line: Some(i + 1),
-                detail: excerpt(line, m.start(), m.end()),
+                detail: if excerpts {
+                    excerpt(line, m.start(), m.end())
+                } else {
+                    format!("matches the {} rule (excerpt hidden)", rule.id)
+                },
                 rule: rule.id.to_string(),
+                fingerprint: fingerprint(rule.id, display, line),
+                root: 0,
             });
         }
     }
@@ -303,6 +351,8 @@ fn dependencies(display: &str, name: &str, text: &str, findings: &mut Vec<Findin
             line: (line > 0).then_some(line),
             detail: format!("depends on {}", rule.name),
             rule: format!("dependency:{}", rule.name),
+            fingerprint: fingerprint(&format!("dependency:{}", rule.name), display, ""),
+            root: 0,
         });
     }
 }

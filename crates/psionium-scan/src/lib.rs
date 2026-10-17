@@ -4,17 +4,23 @@
 //! elliptic curves, Diffie-Hellman, DSA), flags classically weak algorithms, and recognizes
 //! post-quantum cryptography that is already in place. It reads source code, configuration,
 //! dependency manifests, certificates and keys, and probes TLS endpoints for post-quantum key
-//! exchange. Reports come as text, Markdown, JSON or a CycloneDX 1.6 CBOM.
+//! exchange. Reports come as text, Markdown, JSON, a self-contained HTML page, SARIF 2.1.0 for
+//! code scanning, or a CycloneDX 1.6 CBOM. A baseline file records accepted findings and paths
+//! to skip, so CI can fail only on new findings.
 //!
 //! Private key material is reported by type and location only; it is never copied into a report.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+mod baseline;
+mod guidance;
+mod html;
 mod material;
 mod model;
 mod report;
 mod rules;
+mod sarif;
 mod scan;
 mod tls;
 mod util;
@@ -22,10 +28,11 @@ mod util;
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+pub use baseline::{Accepted, AcceptedFinding, Baseline};
 pub use model::{Category, CertificateInfo, Finding, Primitive, Source, TlsResult};
 pub use report::Report;
 pub use rules::rule_count;
-pub use scan::ScanOptions;
+pub use scan::{BASELINE_FILE, ScanOptions};
 pub use tls::probe as probe_tls;
 
 /// Scans files and folders. Missing paths are reported as errors.
@@ -36,14 +43,20 @@ pub fn scan_paths<P: AsRef<Path>>(paths: &[P], options: &ScanOptions) -> Result<
         .unwrap_or(0);
     let mut report = Report::new(started);
     let mut stats = scan::WalkStats::default();
-    for path in paths {
+    for (index, path) in paths.iter().enumerate() {
         let path = path.as_ref();
         if !path.exists() {
             return Err(format!("{} does not exist", path.display()));
         }
+        let ignored = scan::ignore_matcher(path, &options.ignore)?;
         report.roots.push(path.display().to_string());
-        scan::walk(path, options, &mut report.findings, &mut stats);
+        let start = report.findings.len();
+        scan::walk(path, options, ignored, &mut report.findings, &mut stats);
+        for f in &mut report.findings[start..] {
+            f.root = index;
+        }
     }
+    util::disambiguate(&mut report.findings);
     report.files_scanned = stats.scanned;
     report.files_skipped = stats.skipped;
     Ok(report)

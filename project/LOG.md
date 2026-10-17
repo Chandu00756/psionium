@@ -2,6 +2,24 @@
 
 Newest first. Every session adds one entry: date, who, what was done, how it was verified, what is left.
 
+## 2026-10-16 — Claude (Opus 5.5): Stage 2 started with Scan Stage A
+
+**Done**
+- Read every project doc (README, CHANGELOG, SECURITY, `docs/`, `project/`, `project/design/` 01–14). Stage 1 is done apart from owner items (D12, D13, A1). The interactive shell waits on D11 (brand), so started with the Stage 2 items that need no owner decision: Scan Stage A from `design/10`.
+- `psionium-scan`: `fingerprint` on every finding; `ScanOptions::excerpts` and `ScanOptions::ignore`; `Baseline` (parse, `to_toml`, `accepting`) and `Report::apply_baseline`; `Report::to_html` (self-contained, no scripts or network, light/dark, phone layout, per-algorithm guidance in `guidance.rs`, NIST IR 8547 draft dates); `Report::to_sarif` (2.1.0, rules with help and `security-severity`, partial fingerprints, suppressions for accepted findings, `uriBaseId` for absolute roots). New dependency: `toml` 1.1.8.
+- `psion scan`: `--format html|sarif`, `--no-excerpts`, `--baseline FILE`, `--no-baseline`, `--write-baseline FILE`; `.psionium-scan.toml` is read from the current folder when present.
+- Docs: `docs/scan.md` (formats, SARIF upload, baselines), README command table, CHANGELOG "Unreleased". Decision recorded in `DECISIONS.md`.
+
+**Verified**
+- Full suite from `RULES.md`: fmt, clippy `-D warnings`, `cargo test --workspace --locked` (5 new scanner tests, 1 new CLI test), `cargo audit` (153 crates, clean), Go interop, `sh -n install.sh`.
+- By hand with the built binary: baseline write → edit (lines shifted) → only the new finding fails; reasons and `ignore` kept on rewrite; stale entries reported; malformed baselines rejected with clear errors; SARIF URIs for relative, absolute and single-file roots; HTML in the browser pane in dark and light, at desktop and 375 px (no horizontal scroll).
+
+**Left / next agent**
+- Committed locally on `main` with the owner's approval; not pushed.
+- Ask the owner D11 (shell brand), then build the TUI per `design/05`.
+- Other Stage 2 items that need no decision: GitHub Action `psionium/scan-action@v1` (needs a new repo: owner), Docker image, GitLab template, custom rules in the baseline, heritage utilities (`encode`/`decode`/`compress`), `psion doctor`/`completions`, `cargo-fuzz` targets (add the baseline parser), benchmarks, SLH-DSA.
+- Reports and baselines are written with mode 0600 (the CLI's atomic writer uses a private temp file; this was already true for reports in 1.0). Harmless for git, but worth a look when the writer is next touched.
+
 ## 2026-10-16 — Claude (Opus 5.5): full platform design written
 
 **Done**

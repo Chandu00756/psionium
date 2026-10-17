@@ -1,4 +1,5 @@
-//! The scan report and its renderings: text, Markdown, JSON and a CycloneDX 1.6 CBOM.
+//! The scan report and its renderings: text, Markdown, JSON and a CycloneDX 1.6 CBOM. HTML and
+//! SARIF are in their own modules.
 
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -7,9 +8,10 @@ use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use serde::Serialize;
 use serde_json::{Value, json};
 
+use crate::baseline::AcceptedFinding;
 use crate::material::certificate_finding;
 use crate::model::{Category, Finding, Primitive, Source, TlsResult};
-use crate::util::rfc3339;
+use crate::util::{disambiguate, fingerprint, rfc3339};
 
 /// Everything a scan found.
 #[derive(Clone, Debug, Serialize)]
@@ -28,6 +30,10 @@ pub struct Report {
     pub findings: Vec<Finding>,
     /// TLS endpoint results.
     pub tls: Vec<TlsResult>,
+    /// Findings a baseline accepts. They are left out of `findings`, the counts and
+    /// `--fail-on`, but stay in the CBOM, which is an inventory.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub accepted: Vec<AcceptedFinding>,
 }
 
 impl Report {
@@ -40,6 +46,7 @@ impl Report {
             files_skipped: 0,
             findings: Vec::new(),
             tls: Vec::new(),
+            accepted: Vec::new(),
         }
     }
 
@@ -61,6 +68,7 @@ impl Report {
             };
             self.findings.push(Finding {
                 category,
+                fingerprint: fingerprint("tls-key-exchange", &result.target, &algorithm),
                 algorithm,
                 primitive: Primitive::KeyAgree,
                 nist_quantum_level: if result.post_quantum_key_exchange {
@@ -73,13 +81,22 @@ impl Report {
                 line: None,
                 detail,
                 rule: "tls-key-exchange".into(),
+                root: 0,
             });
             if let Some(cert) = &result.certificate {
                 self.findings
                     .push(certificate_finding(&result.target, None, cert, Source::Tls));
             }
+            disambiguate(&mut self.findings);
         }
         self.tls.push(result);
+    }
+
+    /// Findings, then accepted findings.
+    pub(crate) fn all_findings(&self) -> impl Iterator<Item = &Finding> {
+        self.findings
+            .iter()
+            .chain(self.accepted.iter().map(|a| &a.finding))
     }
 
     /// Number of findings in each category.
@@ -92,7 +109,7 @@ impl Report {
     }
 
     /// Findings grouped by category, then algorithm, in report order.
-    fn grouped(&self) -> BTreeMap<Category, BTreeMap<String, Vec<&Finding>>> {
+    pub(crate) fn grouped(&self) -> BTreeMap<Category, BTreeMap<String, Vec<&Finding>>> {
         let mut groups: BTreeMap<Category, BTreeMap<String, Vec<&Finding>>> = BTreeMap::new();
         for f in &self.findings {
             groups
@@ -148,18 +165,25 @@ impl Report {
                 }
             }
         }
+        if !self.accepted.is_empty() {
+            let _ = writeln!(
+                out,
+                "\nAccepted in the baseline (not counted above): {}",
+                count(self.accepted.len(), "finding", "findings")
+            );
+        }
         if !self.tls.is_empty() {
             let _ = writeln!(out, "\nTLS endpoints");
             for t in &self.tls {
                 let _ = writeln!(out, "  {}", tls_line(t));
             }
         }
-        if self.findings.is_empty() && self.tls.is_empty() {
+        if self.findings.is_empty() && self.tls.is_empty() && self.accepted.is_empty() {
             let _ = writeln!(out, "\nNo cryptography found.");
         }
         let _ = writeln!(
             out,
-            "\nUse --format json, markdown or cbom for the full list."
+            "\nUse --format html, markdown, json, sarif or cbom for the full list."
         );
         out
     }
@@ -203,6 +227,24 @@ impl Report {
                 out.push('\n');
             }
         }
+        if !self.accepted.is_empty() {
+            let _ = writeln!(
+                out,
+                "## Accepted in the baseline ({})\n\nNot counted above.\n",
+                self.accepted.len()
+            );
+            let _ = writeln!(out, "| Location | Algorithm | Reason |\n|---|---|---|");
+            for a in &self.accepted {
+                let _ = writeln!(
+                    out,
+                    "| `{}` | {} | {} |",
+                    location(&a.finding),
+                    md(&a.finding.algorithm),
+                    md(&a.reason)
+                );
+            }
+            out.push('\n');
+        }
         if !self.tls.is_empty() {
             let _ = writeln!(out, "## TLS endpoints\n");
             for t in &self.tls {
@@ -222,8 +264,7 @@ impl Report {
         let mut components: Vec<Value> = Vec::new();
         let mut algorithms: BTreeMap<(String, &'static str), Vec<&Finding>> = BTreeMap::new();
         for f in self
-            .findings
-            .iter()
+            .all_findings()
             .filter(|f| !matches!(f.source, Source::Certificate) && f.rule != "certificate")
         {
             algorithms
@@ -283,8 +324,7 @@ impl Report {
             }
         }
         for f in self
-            .findings
-            .iter()
+            .all_findings()
             .filter(|f| f.rule == "certificate" && f.source == Source::Certificate)
         {
             certs += 1;
@@ -336,7 +376,7 @@ fn cert_component(n: usize, target: &str, c: &crate::model::CertificateInfo) -> 
     })
 }
 
-fn category_value(c: Category) -> &'static str {
+pub(crate) fn category_value(c: Category) -> &'static str {
     match c {
         Category::QuantumVulnerable => "quantum-vulnerable",
         Category::Weak => "weak",
@@ -346,18 +386,18 @@ fn category_value(c: Category) -> &'static str {
 }
 
 /// `n` with the singular or plural noun.
-fn count(n: usize, one: &str, many: &str) -> String {
+pub(crate) fn count(n: usize, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
 }
 
-fn location(f: &Finding) -> String {
+pub(crate) fn location(f: &Finding) -> String {
     match f.line {
         Some(l) => format!("{}:{l}", f.location),
         None => f.location.clone(),
     }
 }
 
-fn tls_line(t: &TlsResult) -> String {
+pub(crate) fn tls_line(t: &TlsResult) -> String {
     if !t.reachable {
         return format!(
             "{}: could not check ({})",

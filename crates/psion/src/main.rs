@@ -137,7 +137,7 @@ enum Command {
         /// Also probe this TLS endpoint (host[:port], default port 443); repeatable
         #[arg(long = "tls", value_name = "HOST[:PORT]")]
         tls: Vec<String>,
-        /// Report format: text, markdown, json or cbom (CycloneDX 1.6)
+        /// Report format: text, markdown, html, json, sarif (2.1.0, for code scanning) or cbom (CycloneDX 1.6)
         #[arg(long, default_value = "text")]
         format: String,
         /// Write the report to this file instead of standard output
@@ -152,6 +152,18 @@ enum Command {
         /// Seconds to wait for each TLS connection
         #[arg(long, default_value_t = 10)]
         timeout: u64,
+        /// Leave lines of code out of the report; code findings name the rule instead
+        #[arg(long)]
+        no_excerpts: bool,
+        /// Baseline of accepted findings and ignored paths [default: .psionium-scan.toml in the current folder, if present]
+        #[arg(long, value_name = "FILE", conflicts_with = "no_baseline")]
+        baseline: Option<PathBuf>,
+        /// Do not read a baseline, even if .psionium-scan.toml exists
+        #[arg(long)]
+        no_baseline: bool,
+        /// Write a baseline accepting every current finding (keeping reasons already in the baseline), then report
+        #[arg(long, value_name = "FILE")]
+        write_baseline: Option<PathBuf>,
     },
 }
 
@@ -177,17 +189,25 @@ fn run(cli: Cli) -> Result<ExitCode> {
         include_dependencies,
         fail_on,
         timeout,
+        no_excerpts,
+        baseline,
+        no_baseline,
+        write_baseline,
     } = cli.command
     {
-        return scan(
+        return scan(ScanArgs {
             paths,
-            &tls,
-            &format,
+            tls,
+            format,
             output,
             include_dependencies,
-            &fail_on,
+            fail_on,
             timeout,
-        );
+            excerpts: !no_excerpts,
+            baseline,
+            no_baseline,
+            write_baseline,
+        });
     }
     run_file_command(cli.command).map(|()| ExitCode::SUCCESS)
 }
@@ -253,15 +273,37 @@ fn run_file_command(command: Command) -> Result<()> {
     }
 }
 
-fn scan(
-    mut paths: Vec<PathBuf>,
-    tls: &[String],
-    format: &str,
+struct ScanArgs {
+    paths: Vec<PathBuf>,
+    tls: Vec<String>,
+    format: String,
     output: Option<PathBuf>,
     include_dependencies: bool,
-    fail_on: &str,
+    fail_on: String,
     timeout: u64,
-) -> Result<ExitCode> {
+    excerpts: bool,
+    baseline: Option<PathBuf>,
+    no_baseline: bool,
+    write_baseline: Option<PathBuf>,
+}
+
+const SCAN_FORMATS: &[&str] = &["text", "markdown", "html", "json", "sarif", "cbom"];
+
+fn scan(args: ScanArgs) -> Result<ExitCode> {
+    let ScanArgs {
+        mut paths,
+        tls,
+        format,
+        output,
+        include_dependencies,
+        fail_on,
+        timeout,
+        excerpts,
+        baseline,
+        no_baseline,
+        write_baseline,
+    } = args;
+    let (format, fail_on) = (format.as_str(), fail_on.as_str());
     let threshold = match fail_on {
         "never" => None,
         "quantum-vulnerable" => Some(&[psionium_scan::Category::QuantumVulnerable][..]),
@@ -273,14 +315,38 @@ fn scan(
         ),
         other => bail!("unknown --fail-on \"{other}\" (use quantum-vulnerable, weak or never)"),
     };
-    if !["text", "markdown", "json", "cbom"].contains(&format) {
-        bail!("unknown --format \"{format}\" (use text, markdown, json or cbom)");
+    if !SCAN_FORMATS.contains(&format) {
+        bail!("unknown --format \"{format}\" (use text, markdown, html, json, sarif or cbom)");
     }
     if paths.is_empty() && tls.is_empty() {
         paths.push(PathBuf::from("."));
     }
+    let baseline_path = match baseline {
+        Some(path) => Some(path),
+        None if no_baseline => None,
+        None => {
+            let default = PathBuf::from(psionium_scan::BASELINE_FILE);
+            default.is_file().then_some(default)
+        }
+    };
+    let baseline = match &baseline_path {
+        Some(path) => {
+            let text = fs::read_to_string(path)
+                .with_context(|| format!("could not read baseline {}", path.display()))?;
+            let parsed = psionium_scan::Baseline::parse(&text)
+                .map_err(|e| anyhow!(e))
+                .with_context(|| format!("{} is not a valid baseline", path.display()))?;
+            Some(parsed)
+        }
+        None => None,
+    };
     let options = psionium_scan::ScanOptions {
         include_dependencies,
+        excerpts,
+        ignore: baseline
+            .as_ref()
+            .map(|b| b.ignore.clone())
+            .unwrap_or_default(),
         ..psionium_scan::ScanOptions::default()
     };
     let mut report = if paths.is_empty() {
@@ -290,12 +356,43 @@ fn scan(
     };
     psionium_scan::scan_tls(
         &mut report,
-        tls,
+        &tls,
         std::time::Duration::from_secs(timeout.max(1)),
     );
+    if let (Some(baseline), Some(path)) = (&baseline, &baseline_path) {
+        let stale = report.apply_baseline(baseline);
+        eprintln!(
+            "Using baseline {}: {} accepted",
+            path.display(),
+            plural(report.accepted.len(), "finding", "findings")
+        );
+        if !stale.is_empty() {
+            eprintln!(
+                "psion: {} in the baseline no longer {} anything (fixed, or the line changed); run --write-baseline to tidy it",
+                plural(stale.len(), "entry", "entries"),
+                if stale.len() == 1 { "matches" } else { "match" }
+            );
+        }
+    }
+    if let Some(path) = &write_baseline {
+        let reason = format!(
+            "accepted when this baseline was written on {}; replace with the real reason",
+            report.started.get(..10).unwrap_or(&report.started)
+        );
+        let new = psionium_scan::Baseline::accepting(&report, baseline.as_ref(), &reason);
+        write_atomically(path, false, |w| Ok(w.write_all(new.to_toml().as_bytes())?))?;
+        eprintln!(
+            "Wrote the baseline to {}: {} accepted",
+            path.display(),
+            plural(new.accepted.len(), "finding", "findings")
+        );
+        report.apply_baseline(&new);
+    }
     let rendered = match format {
         "markdown" => report.to_markdown(),
+        "html" => report.to_html(),
         "json" => report.to_json(),
+        "sarif" => report.to_sarif(),
         "cbom" => report.to_cbom(),
         _ => report.to_text(),
     };
@@ -838,6 +935,11 @@ fn append_extension(path: &Path, ext: &str) -> PathBuf {
 
 fn strip_extension(path: &Path, ext: &str) -> Option<PathBuf> {
     (path.extension()? == ext).then(|| path.with_extension(""))
+}
+
+/// `n` with the singular or plural noun.
+fn plural(n: usize, one: &str, many: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { many })
 }
 
 fn shorten(key: &str) -> String {
